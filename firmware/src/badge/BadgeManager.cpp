@@ -32,20 +32,6 @@ void Badge::init() {
     xTaskCreate(modeTask, "ModeTask", 2048, this, 6, NULL);
 }
 
-// void Badge::modeTask(void *pvParameters) {
-//     Badge *self = static_cast<Badge *>(pvParameters);
-//     TouchEvent event;
-
-//     while (true) {
-//         if (touchQueue && xQueueReceive(touchQueue, &event, portMAX_DELAY) == pdTRUE) {
-//             if (self->currentMode) {
-//                 self->currentMode->handleTouch(event);
-//             }
-//         }
-//         vTaskDelay(10 / portTICK_PERIOD_MS);
-//     }
-// }
-
 void Badge::modeTask(void *pvParameters) {
     Badge *self = static_cast<Badge *>(pvParameters);
     TouchEvent event;
@@ -69,7 +55,7 @@ void Badge::modeTask(void *pvParameters) {
                                 self->currentMode->exit();
                             }
                         }
-                        self->display.showTextCenter(u8g2_font_crox5tb_tr, "Exiting...");
+                        self->display.showTextCentered(u8g2_font_crox5tb_tr, "Exiting...");
 
                         // Flash the other handshake LEDs blue 3 times over 1 second
                         for (int j = 0; j < 3; ++j) {

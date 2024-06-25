@@ -35,7 +35,7 @@ class DisplayManager {
     void clear();
     void drawImage(ImageID imageId, u8g2_uint_t x, u8g2_uint_t y);
     void showTextAt(const uint8_t *font, const char *text, u8g2_uint_t x, u8g2_uint_t y);
-    void showTextCenter(const uint8_t *font, const char *text);
+    void showTextCentered(const uint8_t *font, const char *text);
     void showList(const uint8_t *font, const char *items[], int count, int selected);
     void scrollText(const uint8_t *font, const char *text, int speed = 20,
                     int iterations = SCROLL_FOREVER, int offset = SCROLL_OFFSET_MIDDLE);

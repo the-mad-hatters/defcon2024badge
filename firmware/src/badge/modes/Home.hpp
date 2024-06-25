@@ -25,14 +25,11 @@ class HomeMode : public BadgeMode {
 
     void enter() override {
         ESP_LOGD(TAG_HOMEMODE, "Entering Home mode");
-        // display->clear();
         xTaskCreate(homeInitTask, "Home Init Task", 2048, this, 5, &homeTaskHandle);
     }
 
     void exit() override {
         ESP_LOGD(TAG_HOMEMODE, "Exiting Home mode");
-        // display->clear();
-        // ESP_LOGD(TAG_HOMEMODE, "Display cleared");
         stopInitTask();
     }
 
@@ -45,17 +42,23 @@ class HomeMode : public BadgeMode {
         self->leds->clear(true);
         self->leds->setScene(SceneType::GOING_TO_HELL);
 
-        // First scroll the title
-        self->display->scrollText(u8g2_font_crox5tb_tr, "Mad Hatter Auto Revelator", 10, 1);
+        // Show the title
+        self->display->showTextCentered(u8g2_font_crox3hb_tf, "Mad Hatter\nAuto\nRevelator");
+
+        // Wait for 5 seconds
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+        // Scroll the title
+        // self->display->scrollText(u8g2_font_crox5tb_tr, "Mad Hatter Auto Revelator", 10, 1);
 
         // Wait for the scroll to end
-        while (true) {
-            if (xQueueReceive(textScrollEvents, &event, portMAX_DELAY) == pdTRUE) {
-                if (event.type == ScrollEventType::SCROLL_END) {
-                    break;
-                }
-            }
-        }
+        // while (true) {
+        //     if (xQueueReceive(textScrollEvents, &event, portMAX_DELAY) == pdTRUE) {
+        //         if (event.type == ScrollEventType::SCROLL_END) {
+        //             break;
+        //         }
+        //     }
+        // }
 
         // Show the rock image
         ESP_LOGD(TAG_HOMEMODE, "Showing rock image");

@@ -63,20 +63,52 @@ void DisplayManager::showTextAt(const uint8_t *font, const char *text, u8g2_uint
     }
 }
 
-void DisplayManager::showTextCenter(const uint8_t *font, const char *text) {
+void DisplayManager::showTextCentered(const uint8_t *font, const char *text) {
     ESP_LOGD(TAG, "Showing centered text: %s", text);
-    int x, y;
+
+    std::vector<std::string> lines;
+    std::string str(text);
+    size_t pos = 0;
+    std::string token;
+    while ((pos = str.find('\n')) != std::string::npos) {
+        token = str.substr(0, pos);
+        lines.push_back(token);
+        str.erase(0, pos + 1);
+    }
+    if (!str.empty()) {
+        lines.push_back(str);
+    }
+
+    int textHeight    = 0;
+    int displayWidth  = 0;
+    int displayHeight = 0;
+    int y             = 0;
     {
         std::lock_guard<std::mutex> lock(displayMutex);
         u8g2.setFont(font);
-        int textWidth     = u8g2.getStrWidth(text);
-        int textHeight    = u8g2.getMaxCharHeight();
-        int displayWidth  = u8g2.getDisplayWidth();
-        int displayHeight = u8g2.getDisplayHeight();
-        x                 = std::max(0, (displayWidth - textWidth) / 2);
-        y                 = std::max(0, (displayHeight - textHeight) / 2);
+        int lineHeight = u8g2.getMaxCharHeight();
+        textHeight     = lineHeight * lines.size();
+        displayWidth   = u8g2.getDisplayWidth();
+        displayHeight  = u8g2.getDisplayHeight();
+        y              = std::max(0, (displayHeight - textHeight) / 2);
     }
-    showTextAt(font, text, x, y);
+
+    stopAnimations();
+    if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        u8g2.firstPage();
+        do {
+            u8g2.clearBuffer();
+            u8g2.setFontPosTop();
+            for (const auto &line : lines) {
+                int textWidth = u8g2.getStrWidth(line.c_str());
+                int x         = std::max(0, (displayWidth - textWidth) / 2);
+                u8g2.drawStr(x, y, line.c_str());
+                y += u8g2.getMaxCharHeight();
+            }
+        } while (u8g2.nextPage());
+        xSemaphoreGive(peripheralSync);
+    }
 }
 
 void DisplayManager::showList(const uint8_t *font, const char *items[], int count, int selected) {
