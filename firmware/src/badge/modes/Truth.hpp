@@ -13,40 +13,25 @@ static const char *TAG_TRUTHMODE = "TruthMode";
 
 class TruthMode : public BadgeMode {
   public:
-    TruthMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch) {
+    TruthMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch)
+        : truthTaskHandle(NULL), nsfwMode(false) {
         this->display = display;
         this->leds    = leds;
         this->touch   = touch;
 
-        // Load truths from file
-        if (!SPIFFS.exists("/truths.txt")) {
-            ESP_LOGE(TAG_TRUTHMODE, "Truths file not found");
-            return;
-        }
-        File file = SPIFFS.open("/truths.txt");
-        if (!file) {
-            ESP_LOGE(TAG_TRUTHMODE, "Failed to open truths file");
-            return;
+        // Initialize input state and hold start time
+        for (int i = 0; i < HANDSHAKE_COUNT; i++) {
+            inputState[i]    = TOUCH_UP;
+            holdStartTime[i] = 0;
         }
 
-        while (file.available()) {
-            String line = file.readStringUntil('\n');
-            if (line.length() > 0) {
-                truths.push_back(line.c_str());
-            }
-        }
-        file.close();
-
-        if (truths.empty()) {
-            ESP_LOGE(TAG_TRUTHMODE, "No truths loaded");
-        } else {
-            ESP_LOGI(TAG_TRUTHMODE, "Loaded %d truths", truths.size());
-        }
+        // Load truths
+        loadTruths("/truths.txt");
     }
 
     void enter() override {
         ESP_LOGD(TAG_TRUTHMODE, "Entering Truth mode");
-        xTaskCreate(truthTask, "Truth Task", 2048, this, 5, &truthTaskHandle);
+        startTruthTask();
     }
 
     void exit() override {
@@ -80,12 +65,40 @@ class TruthMode : public BadgeMode {
                 if (xQueueReceive(textScrollEvents, &event, portMAX_DELAY) == pdTRUE) {
                     if (event.type == ScrollEventType::SCROLL_END) {
                         self->display->clear();
-                        vTaskDelay(2000 / portTICK_PERIOD_MS); // Wait for a while before displaying
-                                                               // the next truth
+                        vTaskDelay(2000 / portTICK_PERIOD_MS); // Wait briefly before displaying the
+                                                               // next truth
                         break;
                     }
                 }
             }
+        }
+    }
+
+    void handleTouch(TouchEvent event) override {
+        if (inputState[event.pin] != event.type) {
+            // Update the input state and hold start time
+            inputState[event.pin]    = event.type;
+            holdStartTime[event.pin] = event.type == TOUCH_UP ? 0 : millis();
+            ESP_LOGD(TAG_TRUTHMODE, "Touch event: %d %s", event.pin,
+                     event.type == TOUCH_DOWN ? "DOWN" : "UP");
+        }
+
+        handleNSFWToggle();
+    }
+
+  private:
+    TaskHandle_t truthTaskHandle;
+    std::vector<std::string> truths;
+    bool nsfwMode;
+    TouchEventType inputState[HANDSHAKE_COUNT];
+    unsigned long holdStartTime[HANDSHAKE_COUNT];
+
+    void startTruthTask() {
+        if (!truthTaskHandle) {
+            ESP_LOGD(TAG_TRUTHMODE, "Starting truth task");
+            xTaskCreate(truthTask, "Truth Task", 2048, this, 5, &truthTaskHandle);
+        } else {
+            ESP_LOGW(TAG_TRUTHMODE, "Truth task appears to be already running");
         }
     }
 
@@ -97,12 +110,60 @@ class TruthMode : public BadgeMode {
         }
     }
 
-    void handleTouch(TouchEvent event) override {
+    void loadTruths(const char *path) {
+        truths.clear();
+        if (!SPIFFS.exists(path)) {
+            ESP_LOGE(TAG_TRUTHMODE, "Truths file not found");
+            return;
+        }
+        File file = SPIFFS.open(path);
+        if (!file) {
+            ESP_LOGE(TAG_TRUTHMODE, "Failed to open truths file");
+            return;
+        }
+
+        while (file.available()) {
+            String line = file.readStringUntil('\n');
+            if (line.length() > 0) {
+                truths.push_back(line.c_str());
+            }
+        }
+        file.close();
+
+        if (truths.empty()) {
+            ESP_LOGE(TAG_TRUTHMODE, "No truths loaded from %s", path);
+        } else {
+            ESP_LOGI(TAG_TRUTHMODE, "Loaded %d truths from %s", truths.size(), path);
+        }
     }
 
-  private:
-    TaskHandle_t truthTaskHandle;
-    std::vector<std::string> truths;
+    void handleNSFWToggle() {
+        if (inputState[HANDSHAKE_2] == TOUCH_DOWN && inputState[HANDSHAKE_3] == TOUCH_DOWN) {
+            if (holdStartTime[HANDSHAKE_2] == 0 || holdStartTime[HANDSHAKE_3] == 0) {
+                return;
+            }
+            unsigned long currentTime = millis();
+            if (currentTime - holdStartTime[HANDSHAKE_2] >= 1000 &&
+                currentTime - holdStartTime[HANDSHAKE_3] >= 1000) {
+                // Toggle NSFW mode
+                nsfwMode                   = !nsfwMode;
+                holdStartTime[HANDSHAKE_2] = 0;
+                holdStartTime[HANDSHAKE_3] = 0;
+
+                stopTruthTask();
+                ESP_LOGD(TAG_TRUTHMODE, "NSFW mode %s", nsfwMode ? "activated" : "deactivated");
+                display->showTextCentered(u8g2_font_ncenB08_tr,
+                                          nsfwMode ? "NSFW loading..." : "Back to safety");
+                if (nsfwMode) {
+                    loadTruths("/truths_nsfw.txt");
+                } else {
+                    loadTruths("/truths.txt");
+                }
+                vTaskDelay(1500 / portTICK_PERIOD_MS); // Wait briefly so the message can be read
+                startTruthTask();
+            }
+        }
+    }
 };
 
 #endif // MODE_TRUTH_HPP

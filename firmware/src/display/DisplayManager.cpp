@@ -1,3 +1,4 @@
+#include <atomic>
 #include "DisplayManager.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
@@ -5,6 +6,7 @@
 #include "sync.h"
 
 QueueHandle_t textScrollEvents = xQueueCreate(5, sizeof(ScrollEvent));
+std::atomic<TaskHandle_t> scrollHaltNotify(nullptr);
 
 static const char *TAG = "DisplayManager";
 
@@ -64,7 +66,7 @@ void DisplayManager::showTextAt(const uint8_t *font, const char *text, u8g2_uint
 }
 
 void DisplayManager::showTextCentered(const uint8_t *font, const char *text) {
-    ESP_LOGD(TAG, "Showing centered text: %s", text);
+    stopAnimations();
 
     std::vector<std::string> lines;
     std::string str(text);
@@ -93,7 +95,6 @@ void DisplayManager::showTextCentered(const uint8_t *font, const char *text) {
         y              = std::max(0, (displayHeight - textHeight) / 2);
     }
 
-    stopAnimations();
     if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
         std::lock_guard<std::mutex> lock(displayMutex);
         u8g2.firstPage();
@@ -112,8 +113,47 @@ void DisplayManager::showTextCentered(const uint8_t *font, const char *text) {
 }
 
 void DisplayManager::showList(const uint8_t *font, const char *items[], int count, int selected) {
-    const int arrowXOffset = 0;
-    const int textXOffset  = selected == -1 ? 0 : 10;
+    const char *arrowChar  = "➜"; // 0x279C in the unifont font
+    const int arrowPadding = 4;
+
+    int displayWidth = 0, displayHeight = 0, textWidth = 0, textHeight = 0, textXOffset = 0,
+        arrowWidth = 0, arrowHeight = 0, arrowXOffset = 0, arrowYOffset = 0, maxItemsPerPage = 0,
+        scrollOffset = 0;
+    {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        // Calculate the text width and height and get display dimensions
+        u8g2.setFont(font);
+        textWidth     = 0;
+        textHeight    = u8g2.getMaxCharHeight();
+        displayWidth  = u8g2.getDisplayWidth();
+        displayHeight = u8g2.getDisplayHeight();
+        for (int i = 0; i < count; i++) {
+            textWidth = std::max(textWidth, (int)u8g2.getStrWidth(items[i]));
+        }
+        maxItemsPerPage = displayHeight / textHeight;
+
+        // Calculate the arrow position and text offset
+        if (selected >= 0) {
+            u8g2.setFont(u8g2_font_unifont_t_78_79);
+            arrowWidth   = u8g2.getUTF8Width(arrowChar);
+            arrowHeight  = u8g2.getMaxCharHeight();
+            arrowYOffset = (textHeight - arrowHeight) / 2 - 1; // Offset to vertically center the
+                                                               // arrow in the text
+            textXOffset = arrowWidth + arrowPadding;
+
+            // Adjust the scroll offset to ensure the selected item is fully visible
+            if (selected >= maxItemsPerPage - 1) {
+                scrollOffset = selected - (maxItemsPerPage - 2);
+            }
+
+            // Ensure the selected item is not partially cut off at the bottom
+            if (selected < scrollOffset) {
+                scrollOffset = selected;
+            } else if (selected >= scrollOffset + maxItemsPerPage - 1) {
+                scrollOffset = selected - (maxItemsPerPage - 2);
+            }
+        }
+    }
 
     // Render the list
     stopAnimations();
@@ -121,11 +161,13 @@ void DisplayManager::showList(const uint8_t *font, const char *items[], int coun
         std::lock_guard<std::mutex> lock(displayMutex);
         u8g2.firstPage();
         do {
-            u8g2.setFont(font);
-            for (int i = 0; i < count; i++) {
-                u8g2.drawStr(textXOffset, 10 * (i + 1), items[i]);
+            for (int i = scrollOffset; i < std::min(count, scrollOffset + maxItemsPerPage); i++) {
+                int y = (i - scrollOffset + 1) * textHeight;
+                u8g2.setFont(font);
+                u8g2.drawStr(textXOffset, y, items[i]);
                 if (i == selected) {
-                    u8g2.drawGlyph(arrowXOffset, 10 * (i + 1), '>');
+                    u8g2.setFont(u8g2_font_unifont_t_78_79);
+                    u8g2.drawUTF8(arrowXOffset, y + arrowYOffset, arrowChar);
                 }
             }
         } while (u8g2.nextPage());
@@ -161,7 +203,12 @@ void DisplayManager::scrollTask(void *pvParameters) {
              uxTaskPriorityGet(NULL));
     self->doScrollText();
     ESP_LOGD(TAG, "Scroll task complete... cleaning up");
+    self->scrolling        = false;
     self->scrollTaskHandle = NULL;
+    if (TaskHandle_t haltingTask = scrollHaltNotify.load()) {
+        scrollHaltNotify.store(nullptr);
+        xTaskNotifyGive(haltingTask);
+    }
     vTaskDelete(NULL);
 }
 
@@ -210,6 +257,11 @@ void DisplayManager::doScrollText() {
                 xSemaphoreGive(peripheralSync);
             }
 
+            // Check if we need to stop scrolling and exit
+            if (scrollHaltNotify.load()) {
+                return;
+            }
+
             // Delay to control the scroll speed
             vTaskDelay(scrollSpeed / portTICK_PERIOD_MS);
         }
@@ -225,8 +277,6 @@ void DisplayManager::doScrollText() {
             scrollY = random(displayHeight - textHeight);
         }
     }
-
-    scrolling = false;
 }
 
 void DisplayManager::stopAnimations() {
@@ -234,8 +284,12 @@ void DisplayManager::stopAnimations() {
     // Stop any scrolling text
     if (scrollTaskHandle) {
         ESP_LOGD(TAG, "Cleaning up scroll task");
-        vTaskDelete(scrollTaskHandle);
-        scrollTaskHandle  = NULL;
+
+        // Notify the task to stop and wait for it to exit
+        scrollHaltNotify.store(xTaskGetCurrentTaskHandle());
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        // Send a scroll cancel event
         ScrollEvent event = {
             .type = ScrollEventType::SCROLL_CANCEL,
         };

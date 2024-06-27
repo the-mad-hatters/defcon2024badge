@@ -51,8 +51,11 @@ class DisplayManager {
                OLED_SCL, // Clock pin
                OLED_SDA  // Data pin
                )
+        , scrollSpeed(20)
+        , scrollIterations(SCROLL_FOREVER)
+        , scrollOffset(SCROLL_OFFSET_MIDDLE)
         , scrolling(false)
-        , scrollIterations(-1) {};
+        , scrollTaskHandle(NULL) {};
     DisplayManager(const DisplayManager &)            = delete;
     DisplayManager &operator=(const DisplayManager &) = delete;
     bool initialized                                  = false;

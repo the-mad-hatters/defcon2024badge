@@ -24,8 +24,11 @@ enum class ModeType {
     HOME,
     TRUTH,
     REVELATION,
+    MAGIC_8BALL,
     MAD_HATTER_METER,
-    MAD_HATTER_8BALL,
+    LED_MODES,
+    DISPLAY_HANDLE,
+    ABOUT,
 };
 
 // Menu items

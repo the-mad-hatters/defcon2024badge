@@ -13,7 +13,7 @@ void SceneManager::init() {
     LedHandler &leds = LedHandler::getInstance();
 
     // Create all scenes here
-    scenes[SceneType::GOING_TO_HELL] = std::make_unique<GoingToHell>(leds);
+    scenes[SceneType::GOING_TO_HELL] = std::make_unique<GoneToHell>(leds);
 
     // Create the scene task
     xTaskCreate(sceneTask, "SceneTask", 2048, this, 5, NULL);

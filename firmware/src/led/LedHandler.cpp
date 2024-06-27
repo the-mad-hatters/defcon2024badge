@@ -48,12 +48,17 @@ void LedHandler::init() {
     nonAddressableLeds[BOOK_EYE]         = BOOK_EYE_LED_PIN;
 
     // Set up locked LED tracking arrays
-    for (int i = 0; i < ADDRESSABLE_STRIP_COUNT; i++) {
-        lockedLeds[static_cast<AddressableStrip>(i)] = std::vector<bool>(LedCounts[i], false);
-        lockedColors[static_cast<AddressableStrip>(i)] =
-            std::vector<CRGB>(LedCounts[i], CRGB::Black);
-        unlockColors[static_cast<AddressableStrip>(i)] =
-            std::vector<CRGB>(LedCounts[i], CRGB::Black);
+    for (const auto &strip : addressableStrips) {
+        lockedLeds[strip.first]   = std::vector<bool>(LedCounts[strip.first], false);
+        lockedColors[strip.first] = std::vector<CRGB>(LedCounts[strip.first], CRGB::Black);
+        unlockColors[strip.first] = std::vector<CRGB>(LedCounts[strip.first], CRGB::Black);
+    }
+
+    // Initialize non-addressable LED lock states
+    for (const auto &led : nonAddressableLeds) {
+        lockedNonAddressableLeds[led.first]   = false;
+        lockedNonAddressableStates[led.first] = false;
+        unlockNonAddressableStates[led.first] = false;
     }
 
     // Set up the scene manager
@@ -119,11 +124,33 @@ void LedHandler::clear(bool unlock) {
     }
     show();
     for (int i = 0; i < NON_ADDRESSABLE_LED_COUNT; i++) {
-        setNonAddressable(i, false);
+        setNonAddressable(static_cast<NonAddressableLed>(i), false);
     }
 }
 
-void LedHandler::setNonAddressable(int index, bool state) {
-    // std::lock_guard<std::mutex> lock(ledMutex);
-    digitalWrite(nonAddressableLeds[static_cast<NonAddressableLed>(index)], state ? HIGH : LOW);
+void LedHandler::setNonAddressable(NonAddressableLed led, bool on) {
+    std::lock_guard<std::mutex> lock(lockMutex);
+    if (lockedNonAddressableLeds[led]) {
+        unlockNonAddressableStates[led] = on;
+        digitalWrite(nonAddressableLeds[led], lockedNonAddressableStates[led] ? HIGH : LOW);
+    } else {
+        digitalWrite(nonAddressableLeds[led], on ? HIGH : LOW);
+    }
+}
+
+void LedHandler::lockNonAddressable(NonAddressableLed led, bool on) {
+    {
+        std::lock_guard<std::mutex> lock(lockMutex);
+        lockedNonAddressableLeds[led]   = true;
+        lockedNonAddressableStates[led] = on;
+    }
+    setNonAddressable(led, on);
+}
+
+void LedHandler::unlockNonAddressable(NonAddressableLed led) {
+    {
+        std::lock_guard<std::mutex> lock(lockMutex);
+        lockedNonAddressableLeds[led] = false;
+    }
+    setNonAddressable(led, unlockNonAddressableStates[led]);
 }

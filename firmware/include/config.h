@@ -22,14 +22,14 @@
 
 // Lower "Auto Revelator" addressable LED strip
 #define LOWER_LED_PIN         5
-#define LOWER_LED_COUNT       14
+#define LOWER_LED_COUNT       13
 #define LOWER_LED_TYPE        WS2812
 #define LOWER_LED_COLOR_ORDER GRB
 #define LOWER_LED_SPEED       8
 
 // Main board LED strip
 #define MAIN_LED_PIN         38
-#define MAIN_LED_COUNT       15
+#define MAIN_LED_COUNT       12
 #define MAIN_LED_TYPE        WS2812
 #define MAIN_LED_COLOR_ORDER GRB
 #define MAIN_LED_SPEED       8
@@ -42,7 +42,7 @@
 #define TOUCH_LED_SPEED       8
 
 // Addressable LED brightness
-#define LED_BRIGHTNESS 75
+#define LED_BRIGHTNESS 255
 
 // Non-addressable LED pins
 #define MAD_HATTER_HAT_LED_PIN   12

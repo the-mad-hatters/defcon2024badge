@@ -12,7 +12,7 @@ static const char *TAG_HOMEMODE = "HomeMode";
 class HomeMode : public BadgeMode {
   public:
     HomeMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch)
-        : inMenu(false), menuIndex(0) {
+        : homeTaskHandle(NULL), inMenu(false), menuIndex(0) {
         this->display = display;
         this->leds    = leds;
         this->touch   = touch;
@@ -31,6 +31,8 @@ class HomeMode : public BadgeMode {
     void exit() override {
         ESP_LOGD(TAG_HOMEMODE, "Exiting Home mode");
         stopInitTask();
+        leds->unlockNonAddressable(BOOK_EYE); // In case we were in (or switched modes from) the
+                                              // menu
     }
 
     static void homeInitTask(void *pvParameters) {
@@ -43,7 +45,7 @@ class HomeMode : public BadgeMode {
         self->leds->setScene(SceneType::GOING_TO_HELL);
 
         // Show the title
-        self->display->showTextCentered(u8g2_font_crox3hb_tf, "Mad Hatter\nAuto\nRevelator");
+        self->display->showTextCentered(u8g2_font_lubB14_tf, "Mad Hatter\nAuto\nRevelator");
 
         // Wait for 5 seconds
         vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -89,9 +91,11 @@ class HomeMode : public BadgeMode {
         ESP_LOGD(TAG_HOMEMODE, "Updating display");
         if (inMenu) {
             ESP_LOGD(TAG_HOMEMODE, "Showing menu");
+            leds->lockNonAddressable(BOOK_EYE, true);
             display->showList(u8g2_font_ncenB08_tr, menuItems.data(), menuItems.size(), menuIndex);
         } else {
             ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
+            leds->unlockNonAddressable(BOOK_EYE);
             display->drawImage(ImageID::ROCK, 0, 0);
             menuIndex = 0;
         }

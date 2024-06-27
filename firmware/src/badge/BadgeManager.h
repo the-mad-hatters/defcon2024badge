@@ -20,7 +20,8 @@ class Badge {
         return instance;
     }
     void init();
-    static void modeTask(void *pvParameters);
+    static void modeInputTask(void *pvParameters);
+    static void modeManagerTask(void *pvParameters);
     void setMode(ModeType mode);
     BadgeMode *getMode();
     bool hasMode(ModeType mode);

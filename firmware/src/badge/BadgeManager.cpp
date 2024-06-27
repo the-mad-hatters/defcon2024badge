@@ -10,9 +10,15 @@ const std::unordered_map<ModeType, const char *> ModeTitle = {
     {ModeType::HOME, "Home"},
     {ModeType::TRUTH, "Truth"},
     {ModeType::REVELATION, "Revelation"},
+    {ModeType::MAGIC_8BALL, "Magic 8 Ball"},
     {ModeType::MAD_HATTER_METER, "Mad Hatter Meter"},
-    {ModeType::MAD_HATTER_8BALL, "Mad Hatter 8 Ball"},
+    {ModeType::LED_MODES, "LED Modes"},
+    {ModeType::DISPLAY_HANDLE, "Display Handle"},
+    {ModeType::ABOUT, "About"},
 };
+
+// Queue to handle a single mode change at a time
+QueueHandle_t modeQueue = xQueueCreate(1, sizeof(ModeType));
 
 void Badge::init() {
     // Initialize the rest of the badge components
@@ -25,14 +31,23 @@ void Badge::init() {
     modes[ModeType::HOME]  = std::make_unique<HomeMode>(&display, &leds, &touch);
     modes[ModeType::TRUTH] = std::make_unique<TruthMode>(&display, &leds, &touch);
 
+    // DEBUG: Print all modes and their addresses
+    if (CORE_DEBUG_LEVEL >= 4) {
+        ESP_LOGD(TAG, "Modes:");
+        for (const auto &mode : modes) {
+            ESP_LOGD(TAG, "  %s: %p", ModeTitle.at(mode.first), mode.second.get());
+        }
+    }
+
     // Set the default mode to HOME
     setMode(ModeType::HOME);
 
     // Create the mode task
-    xTaskCreate(modeTask, "ModeTask", 2048, this, 6, NULL);
+    xTaskCreate(modeInputTask, "ModeTask", 2048, this, 6, NULL);
+    xTaskCreate(modeManagerTask, "ModeManagerTask", 2048, this, 5, NULL);
 }
 
-void Badge::modeTask(void *pvParameters) {
+void Badge::modeInputTask(void *pvParameters) {
     Badge *self = static_cast<Badge *>(pvParameters);
     TouchEvent event;
     bool holdingToExit          = false;
@@ -86,36 +101,41 @@ void Badge::modeTask(void *pvParameters) {
             }
 
             // Pass the event to the current mode
-            if (self->currentMode) {
-                self->currentMode->handleTouch(event);
+            {
+                std::lock_guard<std::mutex> lock(self->modeMutex);
+                if (self->currentMode) {
+                    self->currentMode->handleTouch(event);
+                }
             }
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
+// Handles mode switching asynchronously to avoid modeMutex deadlocks due to touch event handling
+void Badge::modeManagerTask(void *pvParameters) {
+    Badge *self = static_cast<Badge *>(pvParameters);
+    ModeType mode;
+
+    while (true) {
+        if (modeQueue && xQueueReceive(modeQueue, &mode, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGD(TAG, "Switching to mode %s", ModeTitle.at(mode));
+            {
+                std::lock_guard<std::mutex> lock(self->modeMutex);
+                if (self->currentMode) {
+                    self->currentMode->exit();
+                }
+                self->currentMode = self->modes[mode].get();
+                if (self->currentMode) {
+                    self->currentMode->enter();
+                }
+            }
+        }
+    }
+}
+
 void Badge::setMode(ModeType mode) {
-    ESP_LOGD(TAG, "setMode(%d: %s)", static_cast<int>(mode), ModeTitle.at(mode));
-    {
-        std::lock_guard<std::mutex> lock(modeMutex);
-        if (currentMode) {
-            ESP_LOGD(TAG, "Calling exit on current mode");
-            currentMode->exit();
-        } else {
-            ESP_LOGD(TAG, "currentMode is NULL");
-        }
-        currentMode = modes[mode].get();
-    }
-    ESP_LOGD(TAG, "currentMode set to: %p", currentMode);
-    ESP_LOGD(TAG, "Switching to mode %s", ModeTitle.at(mode));
-    ESP_LOGD(TAG, "currentMode: %p", currentMode);
-    {
-        std::lock_guard<std::mutex> lock(modeMutex);
-        if (currentMode) {
-            ESP_LOGD(TAG, "Calling enter on new mode");
-            currentMode->enter();
-        }
-    }
+    xQueueSend(modeQueue, &mode, portMAX_DELAY);
 }
 
 BadgeMode *Badge::getMode() {

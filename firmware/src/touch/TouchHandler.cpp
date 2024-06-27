@@ -40,7 +40,6 @@ void TouchHandler::touchTask(void *pvParameters) {
     while (true) {
         for (int i = 0; i < HANDSHAKE_COUNT; i++) {
             touchValues[i] = touchRead(touchPins[i]);
-            // ESP_LOGD(TAG, "Touch value %d: %d", i, touchValues[i]);
             if (lastTouch[i] == 0) {
                 lastTouch[i] = millis();
             } else if (millis() - lastTouch[i] > HANDSHAKE_DEBOUNCE) {

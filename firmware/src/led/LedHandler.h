@@ -60,10 +60,25 @@ class LedHandler {
     /**
      * @brief Set the state of a single LED on a non-addressable strip
      *
-     * @param index The index of the LED to set
-     * @param state The state to set the LED to (on/off)
+     * @param led The non-addressable LED to set
+     * @param on True to turn the LED on, false to turn it off
      */
-    void setNonAddressable(int index, bool state);
+    void setNonAddressable(NonAddressableLed led, bool on);
+
+    /**
+     * @brief Lock a non-addressable LED to prevent other operations from overwriting it
+     *
+     * @param led The non-addressable LED to lock
+     * @param on The state to set the LED to
+     */
+    void lockNonAddressable(NonAddressableLed led, bool on);
+
+    /**
+     * @brief Unlock a non-addressable LED to allow other operations to overwrite it
+     *
+     * @param led The non-addressable LED to unlock
+     */
+    void unlockNonAddressable(NonAddressableLed led);
 
     /**
      * @brief Set an animation scene to run. A scene may be set at any time and will be run
@@ -91,6 +106,10 @@ class LedHandler {
     std::map<AddressableStrip, std::vector<CRGB>> lockedColors;
     std::map<AddressableStrip, std::vector<CRGB>> unlockColors; // Colors for restoring unlocked
                                                                 // LEDs
+    std::map<NonAddressableLed, bool> lockedNonAddressableLeds;
+    std::map<NonAddressableLed, bool> lockedNonAddressableStates;
+    std::map<NonAddressableLed, bool> unlockNonAddressableStates; // States for restoring unlocked
+                                                                  // non-addressable LEDs
     std::mutex lockMutex;
 };
 
