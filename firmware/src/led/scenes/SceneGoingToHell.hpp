@@ -181,7 +181,8 @@ class GoneToHell : public SceneBase {
         for (int i = 0; i < MAIN_LED_COUNT; ++i) {
             int ledIndex = (mainIndex + i) % MAIN_LED_COUNT;
             // Calculate the brightness based on the distance from the front LED
-            uint8_t brightness = 255 - (i * (255 / MAIN_LED_COUNT));
+            uint8_t brightness =
+                MAIN_LED_BASE_BRIGHTNESS - (i * (MAIN_LED_BASE_BRIGHTNESS / MAIN_LED_COUNT));
             // Calculate the color based on color order (rainbow colors basically)
             CRGB color = CHSV((ledIndex * 256 / MAIN_LED_COUNT), 255, brightness);
             leds.setAddressable(MAIN, ledIndex, color);

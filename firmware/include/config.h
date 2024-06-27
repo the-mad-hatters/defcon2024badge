@@ -28,11 +28,12 @@
 #define LOWER_LED_SPEED       8
 
 // Main board LED strip
-#define MAIN_LED_PIN         38
-#define MAIN_LED_COUNT       12
-#define MAIN_LED_TYPE        WS2812
-#define MAIN_LED_COLOR_ORDER GRB
-#define MAIN_LED_SPEED       8
+#define MAIN_LED_PIN             38
+#define MAIN_LED_COUNT           12
+#define MAIN_LED_TYPE            WS2812
+#define MAIN_LED_COLOR_ORDER     GRB
+#define MAIN_LED_BASE_BRIGHTNESS 100
+#define MAIN_LED_SPEED           8
 
 // Touch button addressable LED strip
 #define TOUCH_LED_PIN         17
