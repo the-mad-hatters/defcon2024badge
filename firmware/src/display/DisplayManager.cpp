@@ -116,44 +116,12 @@ void DisplayManager::showList(const uint8_t *font, const char *items[], int coun
     const char *arrowChar  = "➜"; // 0x279C in the unifont font
     const int arrowPadding = 4;
 
-    int displayWidth = 0, displayHeight = 0, textWidth = 0, textHeight = 0, textXOffset = 0,
-        arrowWidth = 0, arrowHeight = 0, arrowXOffset = 0, arrowYOffset = 0, maxItemsPerPage = 0,
-        scrollOffset = 0;
-    {
-        std::lock_guard<std::mutex> lock(displayMutex);
-        // Calculate the text width and height and get display dimensions
-        u8g2.setFont(font);
-        textWidth     = 0;
-        textHeight    = u8g2.getMaxCharHeight();
-        displayWidth  = u8g2.getDisplayWidth();
-        displayHeight = u8g2.getDisplayHeight();
-        for (int i = 0; i < count; i++) {
-            textWidth = std::max(textWidth, (int)u8g2.getStrWidth(items[i]));
-        }
-        maxItemsPerPage = displayHeight / textHeight;
-
-        // Calculate the arrow position and text offset
-        if (selected >= 0) {
-            u8g2.setFont(u8g2_font_unifont_t_78_79);
-            arrowWidth   = u8g2.getUTF8Width(arrowChar);
-            arrowHeight  = u8g2.getMaxCharHeight();
-            arrowYOffset = (textHeight - arrowHeight) / 2 - 1; // Offset to vertically center the
-                                                               // arrow in the text
-            textXOffset = arrowWidth + arrowPadding;
-
-            // Adjust the scroll offset to ensure the selected item is fully visible
-            if (selected >= maxItemsPerPage - 1) {
-                scrollOffset = selected - (maxItemsPerPage - 2);
-            }
-
-            // Ensure the selected item is not partially cut off at the bottom
-            if (selected < scrollOffset) {
-                scrollOffset = selected;
-            } else if (selected >= scrollOffset + maxItemsPerPage - 1) {
-                scrollOffset = selected - (maxItemsPerPage - 2);
-            }
-        }
-    }
+    int displayWidth = 0, displayHeight = 0, arrowWidth = 0, arrowHeight = 0, textWidth = 0,
+        textHeight = 0, textXOffset = 0, textYOffset = 0, arrowXOffset = 0, arrowYOffset = 0,
+        maxItemsPerPage = 0, scrollOffset = 0;
+    listCalc(font, items, count, selected, textXOffset, textYOffset, arrowXOffset, arrowYOffset,
+             maxItemsPerPage, scrollOffset, displayWidth, displayHeight, textWidth, textHeight,
+             arrowWidth, arrowHeight, arrowChar, arrowPadding);
 
     // Render the list
     stopAnimations();
@@ -168,6 +136,138 @@ void DisplayManager::showList(const uint8_t *font, const char *items[], int coun
                 if (i == selected) {
                     u8g2.setFont(u8g2_font_unifont_t_78_79);
                     u8g2.drawUTF8(arrowXOffset, y + arrowYOffset, arrowChar);
+                }
+            }
+        } while (u8g2.nextPage());
+        xSemaphoreGive(peripheralSync);
+    }
+}
+
+void DisplayManager::showPrompt(const uint8_t *font, const char *prompt, const char *options[],
+                                int option_count, int selected) {
+    const char *arrowChar   = "➜"; // 0x279C in the unifont font
+    const int arrowPadding  = 4;
+    const int promptPadding = 8;
+
+    int displayWidth = 0, displayHeight = 0, arrowWidth = 0, arrowHeight = 0, textWidth = 0,
+        textHeight = 0, textXOffset = 0, textYOffset = 0, arrowXOffset = 0, arrowYOffset = 0,
+        maxItemsPerPage = 0, scrollOffset = 0;
+    listCalc(font, options, option_count, selected, textXOffset, textYOffset, arrowXOffset,
+             arrowYOffset, maxItemsPerPage, scrollOffset, displayWidth, displayHeight, textWidth,
+             textHeight, arrowWidth, arrowHeight, arrowChar, arrowPadding);
+
+    // Render the prompt
+    stopAnimations();
+    if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        u8g2.firstPage();
+        do {
+            // Draw prompt centered at the top
+            u8g2.setFont(font);
+            int promptWidth = u8g2.getStrWidth(prompt);
+            int promptX     = (displayWidth - promptWidth) / 2;
+            u8g2.drawStr(promptX, promptPadding, prompt);
+
+            // Draw options centered below the prompt
+            int yOffset = textHeight;
+            for (int i = scrollOffset; i < std::min(option_count, scrollOffset + maxItemsPerPage);
+                 i++) {
+                int y           = yOffset + (promptPadding * 2) + (i - scrollOffset) * textHeight;
+                int optionWidth = u8g2.getStrWidth(options[i]);
+                int optionX     = (displayWidth - textWidth) / 2;
+                u8g2.setFont(font);
+                u8g2.drawStr(optionX, y, options[i]);
+                if (i == selected) {
+                    u8g2.setFont(u8g2_font_unifont_t_78_79);
+                    u8g2.drawUTF8(optionX - (arrowWidth + arrowPadding - arrowXOffset),
+                                  y + arrowYOffset, arrowChar);
+                }
+            }
+        } while (u8g2.nextPage());
+        xSemaphoreGive(peripheralSync);
+    }
+}
+
+void DisplayManager::showTextEntry(const uint8_t *font, const uint8_t *selectedFont,
+                                   const char *prompt, const char *enteredText,
+                                   const char *availableChars, int selectedIndex) {
+    const int promptPadding   = 8;
+    const int cursorPadding   = 4;
+    const int selectorPadding = 2;
+
+    int displayWidth = 0, displayHeight = 0, promptWidth = 0, enteredWidth = 0, enteredHeight = 0,
+        selectedCharHeight = 0, selectedCharWidth = 0, textXOffset = 0, textYOffset = 0;
+    {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        u8g2.setFont(font);
+        promptWidth   = u8g2.getStrWidth(prompt);
+        enteredHeight = u8g2.getMaxCharHeight();
+        displayWidth  = u8g2.getDisplayWidth();
+        displayHeight = u8g2.getDisplayHeight();
+        enteredWidth  = u8g2.getStrWidth(enteredText);
+        u8g2.setFont(selectedFont);
+        selectedCharWidth  = u8g2.getMaxCharWidth();
+        selectedCharHeight = u8g2.getMaxCharHeight();
+    }
+
+    // Calculate the visible part of the character list
+    int visibleChars = displayWidth / (selectedCharWidth + selectorPadding);
+    int startIndex   = std::max(0, selectedIndex - visibleChars / 2);
+    int endIndex     = std::min((int)strlen(availableChars), startIndex + visibleChars);
+
+    // Ensure the selected character is visible
+    if (selectedIndex < startIndex) {
+        startIndex = selectedIndex;
+    } else if (selectedIndex >= endIndex) {
+        startIndex = selectedIndex - visibleChars + 1;
+    }
+
+    // Render the text entry UI
+    stopAnimations();
+    if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        u8g2.firstPage();
+        do {
+            // Draw prompt centered at the top
+            u8g2.setFont(font);
+            int promptX = (displayWidth - promptWidth) / 2;
+            u8g2.drawStr(promptX, promptPadding, prompt);
+
+            // Draw entered text with cursor
+            int enteredX = cursorPadding;
+            int enteredY = promptPadding + enteredHeight + cursorPadding;
+            u8g2.setFont(font);
+            u8g2.drawStr(enteredX, enteredY, enteredText);
+            u8g2.drawStr(enteredX + enteredWidth, enteredY, "_");
+
+            // Draw a line to separate the entered text from the character selector
+            int lineY = enteredY + enteredHeight + cursorPadding;
+            u8g2.drawLine(0, lineY, displayWidth, lineY);
+
+            // Draw available characters with selected character highlighted
+            int selectionY = displayHeight - selectedCharHeight - cursorPadding;
+            int selectionX =
+                (displayWidth - (selectedCharWidth + selectorPadding) * visibleChars) / 2;
+
+            for (int i = startIndex; i < endIndex; ++i) {
+                int charX = selectionX + (i - startIndex) * (selectedCharWidth + selectorPadding);
+                char charToDraw[2] = {availableChars[i], '\0'};
+
+                if (i == selectedIndex) {
+                    u8g2.setFont(selectedFont);
+                    u8g2.setDrawColor(1);
+                    int boxWidth  = selectedCharWidth + selectorPadding;
+                    int boxHeight = selectedCharHeight + 2;
+                    int boxX      = charX - (boxWidth - selectedCharWidth) - 1;
+                    int boxY      = selectionY - (boxHeight - selectedCharHeight);
+                    u8g2.drawRBox(boxX, boxY, boxWidth, boxHeight, 3);
+                    u8g2.setDrawColor(0);
+                    u8g2.drawStr(charX, selectionY, charToDraw);
+                    u8g2.setFont(font);
+                    u8g2.setDrawColor(1);
+                } else {
+                    u8g2.drawStr(charX, selectionY + (selectedCharHeight - enteredHeight) / 2,
+                                 charToDraw);
                 }
             }
         } while (u8g2.nextPage());
@@ -280,7 +380,7 @@ void DisplayManager::doScrollText() {
 }
 
 void DisplayManager::stopAnimations() {
-    ESP_LOGD(TAG, "Stopping animations");
+    // ESP_LOGD(TAG, "Stopping animations");
     // Stop any scrolling text
     if (scrollTaskHandle) {
         ESP_LOGD(TAG, "Cleaning up scroll task");
@@ -296,4 +396,49 @@ void DisplayManager::stopAnimations() {
         xQueueSend(textScrollEvents, &event, 0);
     }
     scrolling = false;
+}
+
+void DisplayManager::listCalc(const uint8_t *font, const char *items[], int itemCount, int selected,
+                              int &textXOffset, int &textYOffset, int &arrowXOffset,
+                              int &arrowYOffset, int &maxItemsPerPage, int &scrollOffset,
+                              int &displayWidth, int &displayHeight, int &textWidth,
+                              int &textHeight, int &arrowWidth, int &arrowHeight,
+                              const char *arrowChar, const int arrowPadding) {
+    {
+
+        std::lock_guard<std::mutex> lock(displayMutex);
+        // Calculate the text width and height and get display dimensions
+        u8g2.setFont(font);
+        textWidth     = 0;
+        textHeight    = u8g2.getMaxCharHeight();
+        displayWidth  = u8g2.getDisplayWidth();
+        displayHeight = u8g2.getDisplayHeight();
+        for (int i = 0; i < itemCount; i++) {
+            textWidth = std::max(textWidth, (int)u8g2.getStrWidth(items[i]));
+        }
+        maxItemsPerPage = displayHeight / textHeight;
+
+        // Calculate the arrow position and text offset
+        if (selected >= 0) {
+            u8g2.setFont(u8g2_font_unifont_t_78_79);
+            arrowWidth   = u8g2.getUTF8Width(arrowChar);
+            arrowHeight  = u8g2.getMaxCharHeight();
+            arrowXOffset = 0;
+            arrowYOffset = (textHeight - arrowHeight) / 2 - 1; // Offset to vertically center the
+                                                               // arrow with respect to the text
+            textXOffset = arrowWidth + arrowPadding;
+
+            // Adjust the scroll offset to ensure the selected item is fully visible
+            if (selected >= maxItemsPerPage - 1) {
+                scrollOffset = selected - (maxItemsPerPage - 2);
+            }
+
+            // Ensure the selected item is not partially cut off at the bottom
+            if (selected < scrollOffset) {
+                scrollOffset = selected;
+            } else if (selected >= scrollOffset + maxItemsPerPage - 1) {
+                scrollOffset = selected - (maxItemsPerPage - 2);
+            }
+        }
+    }
 }

@@ -37,6 +37,10 @@ class DisplayManager {
     void showTextAt(const uint8_t *font, const char *text, u8g2_uint_t x, u8g2_uint_t y);
     void showTextCentered(const uint8_t *font, const char *text);
     void showList(const uint8_t *font, const char *items[], int count, int selected);
+    void showPrompt(const uint8_t *font, const char *prompt, const char *options[],
+                    int option_count, int selected);
+    void showTextEntry(const uint8_t *font, const uint8_t *selectedFont, const char *prompt,
+                       const char *enteredText, const char *availableChars, int selectedIndex);
     void scrollText(const uint8_t *font, const char *text, int speed = 20,
                     int iterations = SCROLL_FOREVER, int offset = SCROLL_OFFSET_MIDDLE);
 
@@ -63,6 +67,12 @@ class DisplayManager {
     static void scrollTask(void *pvParameters);
     void doScrollText();
     void stopAnimations();
+
+    void listCalc(const uint8_t *font, const char *items[], int itemCount, int selected,
+                  int &textXOffset, int &textYOffset, int &arrowXOffset, int &arrowYOffset,
+                  int &maxItemsPerPage, int &scrollOffset, int &displayWidth, int &displayHeight,
+                  int &textWidth, int &textHeight, int &arrowWidth, int &arrowHeight,
+                  const char *arrowChar, int arrowPadding);
 
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
     const uint8_t *scrollFont;
