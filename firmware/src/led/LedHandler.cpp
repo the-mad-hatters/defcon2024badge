@@ -29,7 +29,7 @@ void LedHandler::init() {
         .addLeds<TOUCH_LED_TYPE, TOUCH_LED_PIN, TOUCH_LED_COLOR_ORDER>(touchStrip.leds,
                                                                        TOUCH_LED_COUNT)
         .setCorrection(TypicalLEDStrip);
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(255);
 
     addressableStrips[UPPER] = &upperStrip;
     addressableStrips[LOWER] = &lowerStrip;

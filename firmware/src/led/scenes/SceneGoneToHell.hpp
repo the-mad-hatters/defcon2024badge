@@ -1,5 +1,5 @@
-#ifndef LED_SCENE_GOING_TO_HELL_HPP
-#define LED_SCENE_GOING_TO_HELL_HPP
+#ifndef LED_SCENE_GONETOHELL_HPP
+#define LED_SCENE_GONETOHELL_HPP
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -9,31 +9,23 @@
 
 static const char *TAG_GONETOHELL = "GoneToHell";
 
-/*
- * NOTE: These aren't used yet but I copied them from the arduino v5 code
- */
-
 const TProgmemPalette16 gone_to_hell_p PROGMEM = {
     CRGB::DarkRed, CRGB::Black, CRGB::Red,    CRGB::Black, CRGB::Maroon, CRGB::Black,
     CRGB::Black,   CRGB::Black, CRGB::Orange, CRGB::Black, CRGB::Red,    CRGB::Black,
-    CRGB::Maroon,  CRGB::Black, CRGB::Black,  CRGB::Black
-
+    CRGB::Maroon,  CRGB::Black, CRGB::Black,  CRGB::Black,
 };
 
 const TProgmemPalette16 gone_to_hell_main_p PROGMEM = {
     CRGB::DarkRed, CRGB::Black, CRGB::Red,    CRGB::Black, CRGB::Maroon, CRGB::Black,
     CRGB::Black,   CRGB::Black, CRGB::Orange, CRGB::Black, CRGB::Red,    CRGB::Black,
-    CRGB::Maroon,  CRGB::Black, CRGB::Black,  CRGB::Black
-
+    CRGB::Maroon,  CRGB::Black, CRGB::Black,  CRGB::Black,
 };
 
 class GoneToHell : public SceneBase {
   public:
     GoneToHell(LedHandler &ledHandler, int outerUpdatesPerSecond = 5, int mainUpdatesPerSecond = 15,
-               int nonAddrUpdatesPerSecond = 4, CRGB ulFirstColor = CRGB::Orange,
-               CRGB ulSecondColor = CRGB::Red, CRGB hsFirstColor = CRGB::Orange,
-               CRGB hsSecondColor = CRGB::Purple)
-        : SceneBase()
+               int nonAddrUpdatesPerSecond = 4)
+        : SceneBase(ledHandler)
         , state(State::UL_FORWARD)
         , outerIndex(0)
         , mainIndex(0)
@@ -43,13 +35,10 @@ class GoneToHell : public SceneBase {
         , outerInterval(1000 / outerUpdatesPerSecond)
         , mainInterval(1000 / mainUpdatesPerSecond)
         , nonAddrInterval(1000 / nonAddrUpdatesPerSecond)
-        , ulFirstColor(ulFirstColor)
-        , ulSecondColor(ulSecondColor)
-        , hsFirstColor(hsFirstColor)
-        , hsSecondColor(hsSecondColor)
-        , leds(ledHandler) {
+        , outerPalette(gone_to_hell_p)
+        , mainPalette(gone_to_hell_main_p) {
         resetState();
-    };
+    }
 
     void tick() override {
         if (millis() - lastOuterUpdateTime >= outerInterval) {
@@ -87,12 +76,8 @@ class GoneToHell : public SceneBase {
     int mainInterval;
     int nonAddrInterval;
 
-    CRGB ulFirstColor;
-    CRGB ulSecondColor;
-    CRGB hsFirstColor;
-    CRGB hsSecondColor;
-
-    LedHandler &leds;
+    CRGBPalette16 outerPalette;
+    CRGBPalette16 mainPalette;
 
     // Reset the state machine to the initial state
     void resetState() {
@@ -145,48 +130,20 @@ class GoneToHell : public SceneBase {
 
     // Method to update the upper and lower board LEDs
     void updateUpperLower() {
-        // Show the alternating LED colors
-        if (outerIndex < UPPER_LED_COUNT) {
-            updateOuterLED(UPPER, outerIndex);
-        }
-        if (outerIndex < LOWER_LED_COUNT) {
-            updateOuterLED(LOWER, outerIndex);
-        }
+        updateLedsWithPalette(UPPER, outerPalette, outerIndex, UPPER_LED_BASE_BRIGHTNESS);
+        updateLedsWithPalette(LOWER, outerPalette, outerIndex, LOWER_LED_BASE_BRIGHTNESS);
         leds.show();
-
-        // Clear the LEDs after a short delay
-        vTaskDelay(outerInterval / 2);
-        if (outerIndex < UPPER_LED_COUNT) {
-            updateOuterLED(UPPER, outerIndex, outerIndex % 2 == 0);
-        }
-        if (outerIndex < LOWER_LED_COUNT) {
-            updateOuterLED(LOWER, outerIndex, outerIndex % 2 == 0);
-        }
     }
 
     // Method to update the handshake LEDs
     void updateHandshake() {
-        // Show the LED colors
-        updateOuterLED(TOUCH, outerIndex);
+        updateLedsWithPalette(TOUCH, outerPalette, outerIndex, TOUCH_LED_BASE_BRIGHTNESS);
         leds.show();
-
-        // Clear the LEDs after a short delay
-        vTaskDelay(outerInterval / 2);
-        updateOuterLED(TOUCH, outerIndex, true);
     }
 
-    // Method to update the main PCB ring LEDs - for now I'm just rendering a rainbow pattern so I
-    // could test the main ring since I wasn't before
+    // Method to update the main PCB ring LEDs
     void updateMain() {
-        for (int i = 0; i < MAIN_LED_COUNT; ++i) {
-            int ledIndex = (mainIndex + i) % MAIN_LED_COUNT;
-            // Calculate the brightness based on the distance from the front LED
-            uint8_t brightness =
-                MAIN_LED_BASE_BRIGHTNESS - (i * (MAIN_LED_BASE_BRIGHTNESS / MAIN_LED_COUNT));
-            // Calculate the color based on color order (rainbow colors basically)
-            CRGB color = CHSV((ledIndex * 256 / MAIN_LED_COUNT), 255, brightness);
-            leds.setAddressable(MAIN, ledIndex, color);
-        }
+        updateLedsWithPalette(MAIN, mainPalette, mainIndex, MAIN_LED_BASE_BRIGHTNESS);
         leds.show();
 
         if (++mainIndex >= MAIN_LED_COUNT) {
@@ -201,19 +158,6 @@ class GoneToHell : public SceneBase {
             leds.setNonAddressable(static_cast<NonAddressableLed>(i), i == index);
         }
     }
-
-    // Helper method to update a single LED's color on the state machine LEDs
-    void updateOuterLED(AddressableStrip strip, int index, bool clear = false) {
-        if (outerIndex % 2 == 0) {
-            leds.setAddressable(strip, index,
-                                clear ? CRGB::Black
-                                      : (state < State::HS_FORWARD ? ulFirstColor : hsFirstColor));
-        } else {
-            leds.setAddressable(
-                strip, index,
-                clear ? CRGB::Black : (state < State::HS_FORWARD ? ulSecondColor : hsSecondColor));
-        }
-    }
 };
 
-#endif // LED_SCENE_GOING_TO_HELL_HPP
+#endif // LED_SCENE_GONETOHELL_HPP

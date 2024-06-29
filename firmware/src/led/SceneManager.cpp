@@ -3,7 +3,7 @@
 static const char *TAG = "SceneManager";
 
 // Include all scenes here
-#include "scenes/SceneGoingToHell.hpp"
+#include "scenes/SceneGoneToHell.hpp"
 
 void SceneManager::init() {
     if (initialized) {
