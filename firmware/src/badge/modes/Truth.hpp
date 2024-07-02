@@ -58,7 +58,10 @@ class TruthMode : public BadgeMode {
             ESP_LOGD(TAG_TRUTHMODE, "Displaying truth: %s", truth);
 
             // Display the truth
-            self->display->scrollText(u8g2_font_ncenB08_tr, truth, 10, 1);
+            self->display->setFont(u8g2_font_ncenB08_tr);
+            self->display->setScrollSpeed(10);
+            self->display->setScrollIterations(1);
+            self->display->scrollText(truth);
 
             // Wait for the scroll to end
             while (true) {
@@ -145,22 +148,34 @@ class TruthMode : public BadgeMode {
             unsigned long currentTime = millis();
             if (currentTime - holdStartTime[HANDSHAKE_2] >= 1000 &&
                 currentTime - holdStartTime[HANDSHAKE_3] >= 1000) {
-                // Toggle NSFW mode
-                nsfwMode                   = !nsfwMode;
-                holdStartTime[HANDSHAKE_2] = 0;
-                holdStartTime[HANDSHAKE_3] = 0;
-
                 stopTruthTask();
-                ESP_LOGD(TAG_TRUTHMODE, "NSFW mode %s", nsfwMode ? "activated" : "deactivated");
-                display->showTextCentered(u8g2_font_ncenB08_tr,
-                                          nsfwMode ? "NSFW loading..." : "Back to safety");
-                if (nsfwMode) {
-                    loadTruths("/truths_nsfw.txt");
-                } else {
-                    loadTruths("/truths.txt");
-                }
-                vTaskDelay(1500 / portTICK_PERIOD_MS); // Wait briefly so the message can be read
-                startTruthTask();
+                const char *options[] = {"Activate", "Deactivate"};
+                display->setFont(u8g2_font_ncenB08_tr);
+                display->showPrompt("NSFW mode", options, 2, nsfwMode ? 1 : 0, [this](int index) {
+                    // Set NSFW mode based on the selected index
+                    bool previousNsfwMode = nsfwMode;
+                    nsfwMode              = index == 0;
+
+                    // Make sure we reset the hold start times
+                    holdStartTime[HANDSHAKE_2] = 0;
+                    holdStartTime[HANDSHAKE_3] = 0;
+
+                    if (previousNsfwMode != nsfwMode) {
+                        // Update the truths and display them accordingly
+                        ESP_LOGD(TAG_TRUTHMODE, "NSFW mode %s",
+                                 nsfwMode ? "activated" : "deactivated");
+                        display->setFont(u8g2_font_ncenB08_tr);
+                        display->showTextCentered(nsfwMode ? "NSFW loading..." : "Back to safety");
+                        vTaskDelay(1500 / portTICK_PERIOD_MS); // Wait briefly so the message can be
+                                                               // read
+                        if (nsfwMode) {
+                            loadTruths("/truths_nsfw.txt");
+                        } else {
+                            loadTruths("/truths.txt");
+                        }
+                    }
+                    startTruthTask();
+                });
             }
         }
     }

@@ -43,18 +43,21 @@ void TouchHandler::touchTask(void *pvParameters) {
             if (lastTouch[i] == 0) {
                 lastTouch[i] = millis();
             } else if (millis() - lastTouch[i] > HANDSHAKE_DEBOUNCE) {
+                bool changed = false;
                 if (touchValues[i] > touchThreshold) {
                     // Turn on the LED for this handshake
                     if (lastTouchType[i] != TOUCH_DOWN) {
                         leds.lockLed(TOUCH, TOUCH_LED_COUNT - (i + 1), CRGB::Green);
                         lastTouchType[i] = TOUCH_DOWN;
+                        changed          = true;
                     }
 
                     // Send a touch event
                     TouchEvent event = {
-                        .type  = TOUCH_DOWN,
-                        .pin   = touchPins[i],
-                        .value = touchValues[i],
+                        .type    = TOUCH_DOWN,
+                        .pin     = touchPins[i],
+                        .value   = touchValues[i],
+                        .changed = changed,
                     };
                     xQueueSend(touchQueue, &event, portMAX_DELAY);
                 } else {
@@ -62,13 +65,15 @@ void TouchHandler::touchTask(void *pvParameters) {
                     if (lastTouchType[i] != TOUCH_UP) {
                         leds.unlockLed(TOUCH, TOUCH_LED_COUNT - (i + 1));
                         lastTouchType[i] = TOUCH_UP;
+                        changed          = true;
                     }
 
                     // Send a touch event
                     TouchEvent event = {
-                        .type  = TOUCH_UP,
-                        .pin   = touchPins[i],
-                        .value = touchValues[i],
+                        .type    = TOUCH_UP,
+                        .pin     = touchPins[i],
+                        .value   = touchValues[i],
+                        .changed = changed,
                     };
                     xQueueSend(touchQueue, &event, portMAX_DELAY);
                 }

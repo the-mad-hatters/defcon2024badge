@@ -45,22 +45,11 @@ class HomeMode : public BadgeMode {
         self->leds->setScene(SceneType::GOING_TO_HELL);
 
         // Show the title
-        self->display->showTextCentered(u8g2_font_lubB14_tf, "Mad Hatter\nAuto\nRevelator");
+        self->display->setFont(u8g2_font_lubB14_tf);
+        self->display->showTextCentered("Mad Hatter\nAuto\nRevelator");
 
         // Wait for 5 seconds
         vTaskDelay(5000 / portTICK_PERIOD_MS);
-
-        // Scroll the title
-        // self->display->scrollText(u8g2_font_crox5tb_tr, "Mad Hatter Auto Revelator", 10, 1);
-
-        // Wait for the scroll to end
-        // while (true) {
-        //     if (xQueueReceive(textScrollEvents, &event, portMAX_DELAY) == pdTRUE) {
-        //         if (event.type == ScrollEventType::SCROLL_END) {
-        //             break;
-        //         }
-        //     }
-        // }
 
         // Show the rock image
         ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
@@ -92,48 +81,10 @@ class HomeMode : public BadgeMode {
         if (inMenu) {
             ESP_LOGD(TAG_HOMEMODE, "Showing menu");
             leds->lockNonAddressable(BOOK_EYE, true);
-            display->showList(u8g2_font_ncenB08_tr, menuItems.data(), menuItems.size(), menuIndex);
-        } else {
-            ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
-            leds->unlockNonAddressable(BOOK_EYE);
-            display->drawImage(ImageID::ROCK, 0, 0);
-            menuIndex = 0;
-        }
-    }
+            display->setFont(u8g2_font_ncenB08_tr);
+            display->showList(menuItems.data(), menuItems.size(), menuIndex, [this](int index) {
+                menuIndex = index;
 
-    void handleTouch(TouchEvent event) override {
-        // Only handle touch events if the touch event type has changed
-        if (lastTouchType[event.pin] == event.type) {
-            return;
-        }
-        lastTouchType[event.pin] = event.type;
-
-        // Only react to touch down events
-        if (event.type != TOUCH_DOWN) {
-            return;
-        }
-
-        switch (event.pin) {
-            case HANDSHAKE_1:
-                inMenu = !inMenu;
-                updateDisplay();
-                break;
-            case HANDSHAKE_2:
-                // Move to the previous menu item if we're in the menu (wrap around to the end if at
-                // the beginning)
-                if (inMenu) {
-                    menuIndex = (menuIndex == 0) ? menuItems.size() - 1 : menuIndex - 1;
-                    updateDisplay();
-                }
-                break;
-            case HANDSHAKE_3:
-                // Move to the next menu item if we're in the menu and there is a next item
-                if (inMenu) {
-                    menuIndex = (menuIndex + 1) % menuItems.size();
-                    updateDisplay();
-                }
-                break;
-            case HANDSHAKE_4:
                 // Select the current menu item if we're in the menu
                 Badge &badge     = Badge::getInstance();
                 ModeType newMode = static_cast<ModeType>(menuIndex + 1);
@@ -146,6 +97,25 @@ class HomeMode : public BadgeMode {
                         ESP_LOGE(TAG_HOMEMODE, "Mode not found: %d", newMode);
                     }
                 }
+            });
+        } else {
+            ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
+            leds->unlockNonAddressable(BOOK_EYE);
+            display->drawImage(ImageID::ROCK, 0, 0);
+            menuIndex = 0;
+        }
+    }
+
+    void handleTouch(TouchEvent event) override {
+        // Only react to touch down events
+        if (!event.changed || event.type != TOUCH_DOWN) {
+            return;
+        }
+
+        switch (event.pin) {
+            case HANDSHAKE_1:
+                inMenu = !inMenu;
+                updateDisplay();
                 break;
         }
     }
@@ -155,7 +125,6 @@ class HomeMode : public BadgeMode {
     bool inMenu;
     int menuIndex;
     std::vector<const char *> menuItems;
-    TouchEventType lastTouchType[HANDSHAKE_COUNT] = {TOUCH_UP, TOUCH_UP, TOUCH_UP, TOUCH_UP};
 };
 
 #endif // MODE_HOME_HPP

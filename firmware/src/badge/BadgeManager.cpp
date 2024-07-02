@@ -4,6 +4,8 @@
 #include "modes/Home.hpp"
 #include "modes/Truth.hpp"
 
+#include "modes/Handle.hpp"
+
 static const char *TAG = "BadgeManager";
 
 const std::unordered_map<ModeType, const char *> ModeTitle = {
@@ -31,6 +33,8 @@ void Badge::init() {
     modes[ModeType::HOME]  = std::make_unique<HomeMode>(&display, &leds, &touch);
     modes[ModeType::TRUTH] = std::make_unique<TruthMode>(&display, &leds, &touch);
 
+    modes[ModeType::DISPLAY_HANDLE] = std::make_unique<HandleMode>(&display, &leds, &touch);
+
     // DEBUG: Print all modes and their addresses
     if (CORE_DEBUG_LEVEL >= 4) {
         ESP_LOGD(TAG, "Modes:");
@@ -43,7 +47,7 @@ void Badge::init() {
     setMode(ModeType::HOME);
 
     // Create the mode task
-    xTaskCreate(modeInputTask, "ModeTask", 2048, this, 6, NULL);
+    xTaskCreate(modeInputTask, "ModeTask", 4096, this, 6, NULL);
     xTaskCreate(modeManagerTask, "ModeManagerTask", 2048, this, 5, NULL);
 }
 
@@ -70,23 +74,25 @@ void Badge::modeInputTask(void *pvParameters) {
                                 self->currentMode->exit();
                             }
                         }
-                        self->display.showTextCentered(u8g2_font_crox5tb_tr, "Exiting...");
+                        self->display.setFont(u8g2_font_crox5tb_tr);
+                        self->display.showTextCentered("Exiting...");
+                        self->display.setFont(NULL);
 
                         // Flash the other handshake LEDs blue 3 times over 1 second
                         for (int j = 0; j < 3; ++j) {
-                            for (int i = 1; i < HANDSHAKE_COUNT; ++i) {
+                            for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
                                 self->leds.lockLed(TOUCH, TOUCH_LED_COUNT - (i + 1), CRGB::Blue);
                             }
                             self->leds.show();
                             vTaskDelay((1000 / 3 / 2) / portTICK_PERIOD_MS); // On duration
-                            for (int i = 1; i < HANDSHAKE_COUNT; ++i) {
+                            for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
                                 self->leds.lockLed(TOUCH, TOUCH_LED_COUNT - (i + 1), CRGB::Black);
                             }
                             self->leds.show();
                             vTaskDelay((1000 / 3 / 2) / portTICK_PERIOD_MS); // Off duration
                         }
                         // Unlock the LEDs
-                        for (int i = 1; i < HANDSHAKE_COUNT; ++i) {
+                        for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
                             self->leds.unlockLed(TOUCH, TOUCH_LED_COUNT - (i + 1));
                         }
 
@@ -100,8 +106,11 @@ void Badge::modeInputTask(void *pvParameters) {
                 }
             }
 
-            // Pass the event to the current mode
-            {
+            // Pass the event along to the DisplayManager
+            bool suppressModeHandler = self->display.handleTouch(event);
+
+            // Pass the event to the current mode if not suppressed
+            if (!suppressModeHandler) {
                 std::lock_guard<std::mutex> lock(self->modeMutex);
                 if (self->currentMode) {
                     self->currentMode->handleTouch(event);

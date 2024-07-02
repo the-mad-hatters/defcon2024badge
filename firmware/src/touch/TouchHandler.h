@@ -15,6 +15,7 @@ typedef struct {
     TouchEventType type;
     int pin;
     int value;
+    bool changed;
 } TouchEvent;
 
 extern QueueHandle_t touchQueue;
