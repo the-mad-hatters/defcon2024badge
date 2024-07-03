@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "LedBase.h"
-#include "SceneManager.h"
+#include "scene/SceneManager.h"
 
 class LedHandler {
   public:

@@ -2,9 +2,6 @@
 #define LED_BASE_H
 
 #define FASTLED_INTERNAL // Disable pragma message
-// #define FASTLED_RMT_MAX_CHANNELS   4
-// #define FASTLED_RMT_BUILTIN_DRIVER true
-// #define FASTLED_RMT_SERIAL_DEBUG   1
 
 #include <unordered_map>
 #include "FastLED.h"
@@ -39,13 +36,13 @@ enum NonAddressableLed {
 #define NON_ADDRESSABLE_LED_COUNT 4
 
 /**
- * @brief Addressable LED strip type
+ * @brief Addressable LED strip type alias
  */
-typedef std::unordered_map<AddressableStrip, CPixelView<CRGB> *> AddressableStrips;
+using AddressableStrips = std::unordered_map<AddressableStrip, CPixelView<CRGB> *>;
 
 /**
- * @brief Non-addressable LED type
+ * @brief Non-addressable LED type alias
  */
-typedef std::unordered_map<NonAddressableLed, uint8_t> NonAddressableLeds;
+using NonAddressableLeds = std::unordered_map<NonAddressableLed, uint8_t>;
 
 #endif // LED_BASE_H

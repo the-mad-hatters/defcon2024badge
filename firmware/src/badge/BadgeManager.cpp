@@ -47,7 +47,7 @@ void Badge::init() {
     setMode(ModeType::HOME);
 
     // Create the mode task
-    xTaskCreate(modeInputTask, "ModeTask", 4096, this, 6, NULL);
+    xTaskCreate(modeInputTask, "ModeInputTask", 4096, this, 6, NULL);
     xTaskCreate(modeManagerTask, "ModeManagerTask", 2048, this, 5, NULL);
 }
 

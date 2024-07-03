@@ -42,14 +42,14 @@ class HomeMode : public BadgeMode {
         // Start the LEDs
         ESP_LOGD(TAG_HOMEMODE, "Starting LED scene: GOING_TO_HELL");
         self->leds->clear(true);
-        self->leds->setScene(SceneType::GOING_TO_HELL);
+        self->leds->setScene(SceneType::CELESTIAL_CLOUDS);
 
         // Show the title
         self->display->setFont(u8g2_font_lubB14_tf);
         self->display->showTextCentered("Mad Hatter\nAuto\nRevelator");
 
-        // Wait for 5 seconds
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        // Wait for 3 seconds
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
 
         // Show the rock image
         ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
@@ -64,10 +64,6 @@ class HomeMode : public BadgeMode {
     void stopInitTask() {
         if (homeTaskHandle) {
             ESP_LOGD(TAG_HOMEMODE, "Stopping home init task");
-
-            // Clear the display to make sure the text scroll task gets stopped and cleaned up if
-            // it's still running
-            display->clear();
 
             // Delete the task
             vTaskDelete(homeTaskHandle);

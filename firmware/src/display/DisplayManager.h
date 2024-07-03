@@ -257,13 +257,12 @@ class DisplayManager {
         , promptState{"", std::vector<std::string>(), 0, nullptr}
         , textEntryState{"", "", CHAR_SET_ALL, 0, TextEntryAction::NONE, nullptr}
         , scrollState{nullptr, 20, SCROLL_FOREVER, SCROLL_ALIGN_MIDDLE}
-        , scrollTaskHandle(NULL) {
-        ESP_LOGD("DisplayManager", "Constructor called - currentComponent set to NONE (%d)",
-                 (int)currentComponent);
-    };
+        , scrollTaskHandle(NULL) {};
     DisplayManager(const DisplayManager &)            = delete;
     DisplayManager &operator=(const DisplayManager &) = delete;
     bool initialized                                  = false;
+
+    inline void setComponent(ComponentType component);
 
     // Helper for calculating list bounds and state
     ListBounds getListBounds(std::vector<std::string> items, int selectedIndex);

@@ -6,12 +6,19 @@
 #include "freertos/FreeRTOS.h"
 #include <unordered_map>
 #include "freertos/semphr.h"
-#include "SceneBase.h"
+#include "Scene.h"
 
 // List of LED animation scenes
 enum class SceneType {
     NONE,
-    GOING_TO_HELL,
+    MAD_HATTER,
+    CELESTIAL_CLOUDS,
+    GONE_TO_HELL,
+    SECRET_COMBINATIONS,
+    THE_SALAMANDER,
+    SEER_STONES,
+    DRUNK_AS_HELL,
+    DC32_Y2K_AESTHETIC,
 };
 
 // Scene manager to track and switch between LED animation scenes
@@ -31,8 +38,8 @@ class SceneManager {
     SceneManager &operator=(const SceneManager &) = delete;
     bool initialized                              = false;
 
-    std::unordered_map<SceneType, std::unique_ptr<SceneBase>> scenes;
-    SceneBase *currentScene;
+    std::unordered_map<SceneType, std::unique_ptr<Scene>> scenes;
+    Scene *currentScene;
     std::mutex sceneMutex;
 };
 

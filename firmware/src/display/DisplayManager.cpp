@@ -54,7 +54,7 @@ void DisplayManager::clear() {
     ESP_LOGD(TAG, "Clearing display");
     stopAnimations();
     std::lock_guard<std::mutex> lock(displayMutex);
-    currentComponent = ComponentType::NONE;
+    setComponent(ComponentType::NONE);
     if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
         u8g2.firstPage();
         do {
@@ -170,7 +170,7 @@ void DisplayManager::showTextEntry(const char *prompt, const char *initialText,
 }
 
 void DisplayManager::renderList() {
-    currentComponent = ComponentType::LIST;
+    setComponent(ComponentType::LIST);
 
     // Calculate the list bounds and scroll offset
     ListBounds bounds = getListBounds(listState.items, listState.selectedIndex);
@@ -201,7 +201,7 @@ void DisplayManager::renderList() {
 }
 
 void DisplayManager::renderPrompt() {
-    currentComponent = ComponentType::PROMPT;
+    setComponent(ComponentType::PROMPT);
 
     const int promptPadding = 8;
     TextBounds promptBounds = getTextBounds(font, promptState.prompt.c_str());
@@ -249,7 +249,7 @@ void DisplayManager::renderPrompt() {
 }
 
 void DisplayManager::renderTextEntry() {
-    currentComponent = ComponentType::TEXT_ENTRY;
+    setComponent(ComponentType::TEXT_ENTRY);
 
     const int promptPadding   = 8;
     const int cursorPadding   = 4;
@@ -361,6 +361,18 @@ bool DisplayManager::handleTouch(TouchEvent event) {
         return false;
     }
 
+    ESP_LOGD(TAG, "Handling touch event: %d %s", event.pin,
+             event.type == TOUCH_DOWN ? "DOWN" : "UP");
+    ESP_LOGD(TAG, "Current component: %d", currentComponent);
+    if (currentComponent > ComponentType::TEXT_ENTRY) {
+        ESP_LOGE(TAG, "Invalid component type: %d", currentComponent);
+        return false;
+    }
+    if (currentComponent == ComponentType::NONE) {
+        ESP_LOGD(TAG, "No component to handle touch event");
+        return false;
+    }
+
     // By default don't let mode touch handlers run while we're showing/handling a component
     bool suppressModeHandler = currentComponent != ComponentType::NONE;
 
@@ -377,7 +389,7 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                 listState.selectedIndex = (listState.selectedIndex + 1) % listState.items.size();
                 renderList();
             } else if (event.pin == HANDSHAKE_4) {
-                currentComponent = ComponentType::NONE;
+                setComponent(ComponentType::NONE);
                 ESP_LOGD(TAG, "Selecting list item");
                 if (listState.callback) {
                     listState.callback(listState.selectedIndex);
@@ -397,7 +409,7 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                     (promptState.selectedOption + 1) % promptState.options.size();
                 renderPrompt();
             } else if (event.pin == HANDSHAKE_4) {
-                currentComponent = ComponentType::NONE;
+                setComponent(ComponentType::NONE);
                 ESP_LOGD(TAG, "Selecting prompt option");
                 if (promptState.callback) {
                     promptState.callback(promptState.selectedOption);
@@ -438,7 +450,7 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                 if (event.type == TOUCH_DOWN &&
                     textEntryState.action != TextEntryAction::BACKSPACE) {
                     if (event.pin == HANDSHAKE_1) {
-                        currentComponent      = ComponentType::NONE;
+                        setComponent(ComponentType::NONE);
                         textEntryState.action = TextEntryAction::NONE;
                         ESP_LOGD(TAG, "Exiting text entry");
                         if (textEntryState.callback) {
@@ -588,6 +600,13 @@ void DisplayManager::stopAnimations() {
         xQueueSend(textScrollEvents, &event, 0);
     }
     scrollState.scrolling = false;
+}
+
+inline void DisplayManager::setComponent(ComponentType component) {
+    std::lock_guard<std::mutex> lock(displayMutex);
+    ESP_LOGD(TAG, "Current component: %d", currentComponent);
+    currentComponent = component;
+    ESP_LOGD(TAG, "New component: %d", currentComponent);
 }
 
 DisplayManager::ListBounds DisplayManager::getListBounds(std::vector<std::string> items,
