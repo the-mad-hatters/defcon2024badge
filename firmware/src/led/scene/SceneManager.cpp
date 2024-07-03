@@ -3,9 +3,6 @@
 
 static const char *TAG = "SceneManager";
 
-// Include all scenes here
-// #include "scenes/SceneGoneToHell.hpp"
-
 void SceneManager::init() {
     if (initialized) {
         return;
@@ -40,6 +37,51 @@ void SceneManager::init() {
             {AddressableStrip::LOWER, SceneConfigAddressable(gone_to_hell_p, 0, LOWER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
             {AddressableStrip::MAIN,  SceneConfigAddressable(gone_to_hell_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
             {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 150, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+    scenes[SceneType::SECRET_COMBINATIONS] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(secret_combinations_p, 0, UPPER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(secret_combinations_p, 0, LOWER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(secret_combinations_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 100, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+    scenes[SceneType::THE_SALAMANDER] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(the_salamander_p, 0, UPPER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(the_salamander_p, 0, LOWER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(the_salamander_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 100, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+    scenes[SceneType::SEER_STONES] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(seer_stones_p, 0, UPPER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(seer_stones_p, 0, LOWER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(seer_stones_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 100, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+    scenes[SceneType::DRUNK_AS_HELL] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(drunk_as_hell_p, 0, UPPER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(drunk_as_hell_p, 0, LOWER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(drunk_as_hell_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 100, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+    scenes[SceneType::DC32_Y2K_AESTHETIC] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(dc32_y2k_aesthetic_p, 0, UPPER_LED_BASE_BRIGHTNESS, 20, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(dc32_y2k_aesthetic_p, 0, LOWER_LED_BASE_BRIGHTNESS, 20, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(dc32_y2k_aesthetic_p, 0, MAIN_LED_BASE_BRIGHTNESS, 30, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 100, ScenePattern::COLOR_CYCLE)},
         },
         SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
     );
