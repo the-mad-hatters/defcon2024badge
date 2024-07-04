@@ -18,6 +18,7 @@ enum class SceneType {
     THE_SALAMANDER,
     SEER_STONES,
     DRUNK_AS_HELL,
+    AMERICAN_JESUS,
     DC32_Y2K_AESTHETIC,
 };
 
