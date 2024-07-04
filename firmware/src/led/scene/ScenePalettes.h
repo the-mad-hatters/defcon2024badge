@@ -122,6 +122,21 @@ const TProgmemPalette16 drunk_as_hell_main_p PROGMEM = {
     
 };
 
+//red, white, blue
+const TProgmemPalette16 red_white_blue_p PROGMEM = {
+    CRGB::Red, CRGB::Black, CRGB::White, CRGB::Black,
+    CRGB::Blue, CRGB::Black, CRGB::Red, CRGB::Black,
+    CRGB::White, CRGB::Black, CRGB::Blue, CRGB::Black,
+    CRGB::Red, CRGB::Black, CRGB::White, CRGB::Black
+};
+
+const TProgmemPalette16 red_white_blue_main_p PROGMEM = {
+      CRGB::White, CRGB::Black, CRGB::Red, CRGB::Black,
+    CRGB::White, CRGB::Black, CRGB::Red, CRGB::Black,
+    CRGB::Blue, CRGB::Black, CRGB::Red, CRGB::Black,
+    CRGB::Blue, CRGB::Black, CRGB::Red, CRGB::Black
+};
+
 // DC32 Y2K Aesthetic Theme
 const TProgmemPalette16 dc32_y2k_aesthetic_p PROGMEM = {
     CRGB::DarkOrange, CRGB::Black, CRGB::Red, CRGB::Black,
