@@ -11,7 +11,6 @@ static const char *TAG_HOMEMODE = "HomeMode";
 struct MenuItem {
     std::string name;
     std::function<bool()> action;
-    std::vector<MenuItem> subMenu;
 };
 
 class HomeMode : public BadgeMode {
@@ -162,8 +161,8 @@ class HomeMode : public BadgeMode {
     }
 
     void updateDisplay() {
-        stopInitTask();
         ESP_LOGD(TAG_HOMEMODE, "Updating display");
+        stopInitTask();
 
         if (inMenu) {
             ESP_LOGD(TAG_HOMEMODE, "Showing menu");
@@ -176,10 +175,10 @@ class HomeMode : public BadgeMode {
             }
 
             display->showList(menuItems.data(), menuItems.size(), menuIndex, [this](int index) {
-                menuIndex = index;
                 if (index == -1) {
                     navigateBack();
                 } else if (index >= 0 && index < currentMenu.size()) {
+                    menuIndex   = index;
                     bool goBack = currentMenu[index].action();
                     if (goBack) {
                         navigateBack();
