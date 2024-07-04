@@ -130,6 +130,23 @@ const TProgmemPalette16 red_white_blue_p PROGMEM = {
     CRGB::Red, CRGB::Black, CRGB::White, CRGB::Black
 };
 
+//Gone Clear Palette
+const TProgmemPalette16 gone_clear_p PROGMEM = {
+    CRGB::WhiteSmoke, CRGB::Black, CRGB::WhiteSmoke, CRGB::Black,
+    CRGB::WhiteSmoke, CRGB::Black, CRGB::WhiteSmoke, CRGB::Black,
+    CRGB::WhiteSmoke, CRGB::Black, CRGB::WhiteSmoke, CRGB::Black,
+    CRGB::WhiteSmoke, CRGB::Black, CRGB::WhiteSmoke, CRGB::Black
+    
+};
+
+const TProgmemPalette16 gone_clear_main_p PROGMEM = {
+    CRGB::Yellow, CRGB::Black, CRGB::Red, CRGB::Maroon,
+    CRGB::Yellow, CRGB::Black, CRGB::Red, CRGB::Maroon,
+    CRGB::Yellow, CRGB::Black, CRGB::Red, CRGB::Maroon,
+    CRGB::Yellow, CRGB::Black, CRGB::Red, CRGB::Maroon
+    
+};
+
 const TProgmemPalette16 red_white_blue_main_p PROGMEM = {
       CRGB::White, CRGB::Black, CRGB::Red, CRGB::Black,
     CRGB::White, CRGB::Black, CRGB::Red, CRGB::Black,
