@@ -56,7 +56,7 @@ void Badge::modeInputTask(void *pvParameters) {
     TouchEvent event;
     bool holdingToExit          = false;
     unsigned long holdStartTime = 0;
-    unsigned long exitHoldTime  = 3000;
+    unsigned long exitHoldTime  = 2000;
 
     while (true) {
         if (touchQueue && xQueueReceive(touchQueue, &event, portMAX_DELAY) == pdTRUE) {
@@ -78,7 +78,7 @@ void Badge::modeInputTask(void *pvParameters) {
                         self->display.showTextCentered("Exiting...");
                         self->display.setFont(NULL);
 
-                        // Flash the other handshake LEDs blue 3 times over 1 second
+                        // Flash the handshake LEDs blue 3 times over 1 second
                         for (int j = 0; j < 3; ++j) {
                             for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
                                 self->leds.lockLed(TOUCH, handshakeLeds.right(i), CRGB::Blue);
