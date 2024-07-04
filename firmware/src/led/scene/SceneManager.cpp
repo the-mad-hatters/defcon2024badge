@@ -76,6 +76,18 @@ void SceneManager::init() {
         },
         SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
     );
+
+    scenes[SceneType::AMERICAN_JESUS] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(red_white_blue_p, 0, UPPER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(red_white_blue_p, 0, LOWER_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(red_white_blue_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 100, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+
+    );
+    
     scenes[SceneType::DC32_Y2K_AESTHETIC] = std::make_unique<Scene>(
         SceneConfigMapAddressable{
             {AddressableStrip::UPPER, SceneConfigAddressable(dc32_y2k_aesthetic_p, 0, UPPER_LED_BASE_BRIGHTNESS, 20, ScenePattern::PALETTE_FILL)},
