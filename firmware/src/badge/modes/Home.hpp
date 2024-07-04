@@ -80,6 +80,7 @@ class HomeMode : public BadgeMode {
             {"The Salamander",      [this]() { return setScene(SceneType::THE_SALAMANDER); }},
             {"Seer Stones",         [this]() { return setScene(SceneType::SEER_STONES); }},
             {"Drunk as Hell",       [this]() { return setScene(SceneType::DRUNK_AS_HELL); }},
+            {"American Jesus",      [this]() { return setScene(SceneType::AMERICAN_JESUS);}},
             {"DEF CON 32",          [this]() { return setScene(SceneType::DC32_Y2K_AESTHETIC); }},
         };
 
