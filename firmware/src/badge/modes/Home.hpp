@@ -39,10 +39,14 @@ class HomeMode : public BadgeMode {
         HomeMode *self = static_cast<HomeMode *>(pvParameters);
         ScrollEvent event;
 
+        // Set the menu flag to false in case we're coming back from somewhere else
+        self->inMenu = false;
+
         // Start the LEDs
         ESP_LOGD(TAG_HOMEMODE, "Starting LED scene: GOING_TO_HELL");
         self->leds->clear(true);
-        self->leds->setScene(SceneType::CELESTIAL_CLOUDS);
+        // self->leds->setScene(SceneType::CELESTIAL_CLOUDS);
+        self->leds->setScene(SceneType::DC32_Y2K_AESTHETIC);
 
         // Show the title
         self->display->setFont(u8g2_font_lubB14_tf);
@@ -81,16 +85,22 @@ class HomeMode : public BadgeMode {
             display->showList(menuItems.data(), menuItems.size(), menuIndex, [this](int index) {
                 menuIndex = index;
 
-                // Select the current menu item if we're in the menu
-                Badge &badge     = Badge::getInstance();
-                ModeType newMode = static_cast<ModeType>(menuIndex + 1);
-                if (inMenu) {
-                    ESP_LOGD(TAG_HOMEMODE, "HANDSHAKE_4 pressed - switching to mode %s",
-                             ModeTitle.at(newMode));
-                    if (badge.hasMode(newMode)) {
-                        badge.setMode(newMode);
-                    } else {
-                        ESP_LOGE(TAG_HOMEMODE, "Mode not found: %d", newMode);
+                if (menuIndex == -1) {
+                    // Cancelled - go back to the rock image
+                    inMenu = false;
+                    updateDisplay();
+                } else {
+                    // Select the current menu item if we're in the menu
+                    Badge &badge     = Badge::getInstance();
+                    ModeType newMode = static_cast<ModeType>(menuIndex + 1);
+                    if (inMenu) {
+                        ESP_LOGD(TAG_HOMEMODE, "HANDSHAKE_4 pressed - switching to mode %s",
+                                 ModeTitle.at(newMode));
+                        if (badge.hasMode(newMode)) {
+                            badge.setMode(newMode);
+                        } else {
+                            ESP_LOGE(TAG_HOMEMODE, "Mode not found: %d", newMode);
+                        }
                     }
                 }
             });
@@ -108,11 +118,9 @@ class HomeMode : public BadgeMode {
             return;
         }
 
-        switch (event.pin) {
-            case HANDSHAKE_1:
-                inMenu = !inMenu;
-                updateDisplay();
-                break;
+        if (event.pin == HANDSHAKE_1) {
+            inMenu = !inMenu;
+            updateDisplay();
         }
     }
 

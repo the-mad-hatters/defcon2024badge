@@ -81,19 +81,19 @@ void Badge::modeInputTask(void *pvParameters) {
                         // Flash the other handshake LEDs blue 3 times over 1 second
                         for (int j = 0; j < 3; ++j) {
                             for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                                self->leds.lockLed(TOUCH, TOUCH_LED_COUNT - (i + 1), CRGB::Blue);
+                                self->leds.lockLed(TOUCH, handshakeLeds.right(i), CRGB::Blue);
                             }
                             self->leds.show();
                             vTaskDelay((1000 / 3 / 2) / portTICK_PERIOD_MS); // On duration
                             for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                                self->leds.lockLed(TOUCH, TOUCH_LED_COUNT - (i + 1), CRGB::Black);
+                                self->leds.lockLed(TOUCH, handshakeLeds.right(i), CRGB::Black);
                             }
                             self->leds.show();
                             vTaskDelay((1000 / 3 / 2) / portTICK_PERIOD_MS); // Off duration
                         }
                         // Unlock the LEDs
                         for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                            self->leds.unlockLed(TOUCH, TOUCH_LED_COUNT - (i + 1));
+                            self->leds.unlockLed(TOUCH, handshakeLeds.right(i));
                         }
 
                         // Return to menu

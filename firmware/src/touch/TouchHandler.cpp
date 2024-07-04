@@ -29,7 +29,6 @@ void TouchHandler::init() {
 
 void TouchHandler::touchTask(void *pvParameters) {
     TouchHandler *self                       = static_cast<TouchHandler *>(pvParameters);
-    int touchPins[]                          = {HANDSHAKE_1, HANDSHAKE_2, HANDSHAKE_3, HANDSHAKE_4};
     int touchThreshold                       = TOUCH_THRESHOLD;
     int touchValues[HANDSHAKE_COUNT]         = {0};
     unsigned long lastTouch[HANDSHAKE_COUNT] = {0};
@@ -39,7 +38,7 @@ void TouchHandler::touchTask(void *pvParameters) {
 
     while (true) {
         for (int i = 0; i < HANDSHAKE_COUNT; i++) {
-            touchValues[i] = touchRead(touchPins[i]);
+            touchValues[i] = touchRead(handshakePins.right(i));
             if (lastTouch[i] == 0) {
                 lastTouch[i] = millis();
             } else if (millis() - lastTouch[i] > HANDSHAKE_DEBOUNCE) {
@@ -47,7 +46,7 @@ void TouchHandler::touchTask(void *pvParameters) {
                 if (touchValues[i] > touchThreshold) {
                     // Turn on the LED for this handshake
                     if (lastTouchType[i] != TOUCH_DOWN) {
-                        leds.lockLed(TOUCH, TOUCH_LED_COUNT - (i + 1), CRGB::Green);
+                        leds.lockLed(TOUCH, handshakeLeds.right(i), CRGB::Green);
                         lastTouchType[i] = TOUCH_DOWN;
                         changed          = true;
                     }
@@ -55,7 +54,7 @@ void TouchHandler::touchTask(void *pvParameters) {
                     // Send a touch event
                     TouchEvent event = {
                         .type    = TOUCH_DOWN,
-                        .pin     = touchPins[i],
+                        .pin     = handshakePins.right(i),
                         .value   = touchValues[i],
                         .changed = changed,
                     };
@@ -63,7 +62,7 @@ void TouchHandler::touchTask(void *pvParameters) {
                 } else {
                     // Turn off the LED for this handshake
                     if (lastTouchType[i] != TOUCH_UP) {
-                        leds.unlockLed(TOUCH, TOUCH_LED_COUNT - (i + 1));
+                        leds.unlockLed(TOUCH, handshakeLeds.right(i));
                         lastTouchType[i] = TOUCH_UP;
                         changed          = true;
                     }
@@ -71,7 +70,7 @@ void TouchHandler::touchTask(void *pvParameters) {
                     // Send a touch event
                     TouchEvent event = {
                         .type    = TOUCH_UP,
-                        .pin     = touchPins[i],
+                        .pin     = handshakePins.right(i),
                         .value   = touchValues[i],
                         .changed = changed,
                     };

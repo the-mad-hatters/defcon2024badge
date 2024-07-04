@@ -53,8 +53,8 @@ DisplayManager::TextBounds DisplayManager::getTextBounds(const uint8_t *font, co
 void DisplayManager::clear() {
     ESP_LOGD(TAG, "Clearing display");
     stopAnimations();
-    std::lock_guard<std::mutex> lock(displayMutex);
     setComponent(ComponentType::NONE);
+    std::lock_guard<std::mutex> lock(displayMutex);
     if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
         u8g2.firstPage();
         do {
@@ -336,50 +336,76 @@ void DisplayManager::renderTextEntry() {
 
 bool DisplayManager::handleTouch(TouchEvent event) {
     // Track all input states so we can implement multi-touch actions
-    if (inputState[event.pin] != event.type) {
-        inputState[event.pin] = event.type;
+    if (inputState[handshakePins.left(event.pin)] != event.type) {
+        inputState[handshakePins.left(event.pin)] = event.type;
     }
 
-    // Track the start time of a touch event for repeat actions
-    bool repeatAction = event.type == TOUCH_DOWN && millis() - holdStartTime[event.pin] >= 500;
-    if ((event.changed || repeatAction) && event.type == TOUCH_DOWN) {
-        holdStartTime[event.pin] = millis();
+    // Track hold times for repeat actions and manage repeat state/delay values
+    unsigned long currentTime = millis();
+    unsigned long holdTime    = holdStartTime[handshakePins.left(event.pin)] > 0
+                                    ? currentTime - holdStartTime[handshakePins.left(event.pin)]
+                                    : 0;
+    bool repeatAction         = event.type == TOUCH_DOWN && holdTime >= repeatDelay;
+    if (repeatAction) {
+        repeatCount[handshakePins.left(event.pin)]++;
+        if (repeatCount[handshakePins.left(event.pin)] >= 3) {
+            repeatDelay = INPUT_REPEAT_START_INTERVAL / 3;
+        }
+    }
+    if ((event.changed && event.type == TOUCH_DOWN) || repeatAction) {
+        holdStartTime[handshakePins.left(event.pin)] = currentTime;
     } else if (event.type == TOUCH_UP) {
-        holdStartTime[event.pin] = 0;
+        if (holdStartTime[handshakePins.left(event.pin)] > 0) {
+            holdStartTime[handshakePins.left(event.pin)] = 0;
+            repeatCount[handshakePins.left(event.pin)]   = 0;
+            repeatDelay                                  = INPUT_REPEAT_START_INTERVAL;
+        }
     }
 
-    // Components that want to handle any touch event
-    ComponentType handleAnyType[] = {
-        ComponentType::TEXT_ENTRY, // Text entry will want to handle TOUCH_UP and TOUCH_DOWN
+    // If no component is being displayed, we don't need to handle the touch event
+    if (getComponent() == ComponentType::NONE) {
+        return false;
+    }
+
+    // Components that want to handle any touch event rather than just TOUCH_DOWN
+    ComponentType needsUpDown[] = {
+        // Text entry needs to handle all touch events to handle the backspace action which uses
+        // both HANDSHAKE_2 and HANDSHAKE_3
+        ComponentType::TEXT_ENTRY,
     };
 
-    // Unless it's a TOUCH_DOWN event or the component is in the handleAnyType list, we don't want
+    // Unless it's a TOUCH_DOWN event or the component is in the needsUpDown list, we don't want
     // to handle the event
-    if (std::find(std::begin(handleAnyType), std::end(handleAnyType), currentComponent) ==
-            std::end(handleAnyType) &&
+    if (std::find(std::begin(needsUpDown), std::end(needsUpDown), getComponent()) ==
+            std::end(needsUpDown) &&
         (event.type != TOUCH_DOWN || (!event.changed && !repeatAction))) {
         return false;
     }
 
-    ESP_LOGD(TAG, "Handling touch event: %d %s", event.pin,
-             event.type == TOUCH_DOWN ? "DOWN" : "UP");
-    ESP_LOGD(TAG, "Current component: %d", currentComponent);
-    if (currentComponent > ComponentType::TEXT_ENTRY) {
-        ESP_LOGE(TAG, "Invalid component type: %d", currentComponent);
-        return false;
-    }
-    if (currentComponent == ComponentType::NONE) {
-        ESP_LOGD(TAG, "No component to handle touch event");
-        return false;
-    }
+    // // [DEBUG] Log the touch event and related state
+    // ESP_LOGD(
+    //     TAG,
+    //     "Handling touch event: %d %s - Repeated: %s (%d), Hold: %dms (%d), States: %s %s %s %s",
+    //     event.pin, event.type == TOUCH_DOWN ? "DOWN" : "UP", repeatAction ? "YES" : "NO",
+    //     repeatCount, holdTime, holdStartTime[handshakePins.left(event.pin)],
+    //     inputState[handshakePins.left(HANDSHAKE_1)] == TOUCH_DOWN ? "1" : "0",
+    //     inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_DOWN ? "1" : "0",
+    //     inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_DOWN ? "1" : "0",
+    //     inputState[handshakePins.left(HANDSHAKE_4)] == TOUCH_DOWN ? "1" : "0");
 
     // By default don't let mode touch handlers run while we're showing/handling a component
-    bool suppressModeHandler = currentComponent != ComponentType::NONE;
+    bool suppressModeHandler = (getComponent() != ComponentType::NONE);
 
     // Handle touch events based on the current component being displayed
-    switch (currentComponent) {
+    switch (getComponent()) {
         case ComponentType::LIST:
-            if (event.pin == HANDSHAKE_2) {
+            if (event.pin == HANDSHAKE_1) {
+                setComponent(ComponentType::NONE);
+                ESP_LOGD(TAG, "Exiting list");
+                if (listState.callback) {
+                    listState.callback(-1);
+                }
+            } else if (event.pin == HANDSHAKE_2) {
                 ESP_LOGD(TAG, "Scrolling list up");
                 listState.selectedIndex =
                     (listState.selectedIndex - 1 + listState.items.size()) % listState.items.size();
@@ -397,7 +423,13 @@ bool DisplayManager::handleTouch(TouchEvent event) {
             }
             break;
         case ComponentType::PROMPT:
-            if (event.pin == HANDSHAKE_2) {
+            if (event.pin == HANDSHAKE_1) {
+                setComponent(ComponentType::NONE);
+                ESP_LOGD(TAG, "Exiting prompt");
+                if (promptState.callback) {
+                    promptState.callback(-1);
+                }
+            } else if (event.pin == HANDSHAKE_2) {
                 ESP_LOGD(TAG, "Scrolling prompt up");
                 promptState.selectedOption =
                     (promptState.selectedOption - 1 + promptState.options.size()) %
@@ -422,8 +454,15 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                 // Special case for handling "backspace" (handshakes 2 and 3 pressed together)
                 //
 
-                if (inputState[HANDSHAKE_2] == TOUCH_DOWN &&
-                    inputState[HANDSHAKE_3] == TOUCH_DOWN) {
+                if (inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_DOWN &&
+                    inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_DOWN) {
+                    if (repeatCount[handshakePins.left(HANDSHAKE_2)] ==
+                        repeatCount[handshakePins.left(HANDSHAKE_3)]) {
+                        // Only handle the backspace action once per repeat cycle
+                        if (textEntryState.action == TextEntryAction::BACKSPACE) {
+                            break;
+                        }
+                    }
                     if (textEntryState.enteredText.length() > 0) {
                         textEntryState.enteredText.pop_back();
                         renderTextEntry();
@@ -431,7 +470,16 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                     textEntryState.action = TextEntryAction::BACKSPACE;
                     break;
                 }
-                if (inputState[HANDSHAKE_2] == TOUCH_UP && inputState[HANDSHAKE_3] == TOUCH_UP) {
+                if (inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_UP ||
+                    inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_UP) {
+                    // Reset the repeat count if one of the backspace buttons is released
+                    if (textEntryState.action == TextEntryAction::BACKSPACE) {
+                        repeatCount[handshakePins.left(HANDSHAKE_2)] = 0;
+                        repeatCount[handshakePins.left(HANDSHAKE_3)] = 0;
+                    }
+                }
+                if (inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_UP &&
+                    inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_UP) {
                     if (textEntryState.action == TextEntryAction::BACKSPACE) {
                         textEntryState.action = TextEntryAction::NONE;
                         break;
@@ -456,8 +504,7 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                         if (textEntryState.callback) {
                             textEntryState.callback(textEntryState.enteredText);
                         }
-                    }
-                    if (event.pin == HANDSHAKE_2) {
+                    } else if (event.pin == HANDSHAKE_2) {
                         ESP_LOGD(TAG, "Scrolling text entry left");
                         textEntryState.selectedCharIndex =
                             (textEntryState.selectedCharIndex - 1 +
@@ -465,15 +512,13 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                             textEntryState.availableChars.length();
                         renderTextEntry();
                         textEntryState.action = TextEntryAction::LEFT;
-                    }
-                    if (event.pin == HANDSHAKE_3) {
+                    } else if (event.pin == HANDSHAKE_3) {
                         ESP_LOGD(TAG, "Scrolling text entry right");
                         textEntryState.selectedCharIndex = (textEntryState.selectedCharIndex + 1) %
                                                            textEntryState.availableChars.length();
                         renderTextEntry();
                         textEntryState.action = TextEntryAction::RIGHT;
-                    }
-                    if (event.pin == HANDSHAKE_4) {
+                    } else if (event.pin == HANDSHAKE_4) {
                         ESP_LOGD(TAG, "Selecting text entry character");
                         textEntryState.enteredText +=
                             textEntryState.availableChars[textEntryState.selectedCharIndex];
@@ -604,9 +649,12 @@ void DisplayManager::stopAnimations() {
 
 inline void DisplayManager::setComponent(ComponentType component) {
     std::lock_guard<std::mutex> lock(displayMutex);
-    ESP_LOGD(TAG, "Current component: %d", currentComponent);
     currentComponent = component;
-    ESP_LOGD(TAG, "New component: %d", currentComponent);
+}
+
+inline DisplayManager::ComponentType DisplayManager::getComponent() {
+    std::lock_guard<std::mutex> lock(displayMutex);
+    return currentComponent;
 }
 
 DisplayManager::ListBounds DisplayManager::getListBounds(std::vector<std::string> items,

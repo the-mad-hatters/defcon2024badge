@@ -14,6 +14,9 @@
 #define SCROLL_ALIGN_RANDOM -1
 #define SCROLL_FOREVER      -1
 
+// Initial interval for touch input repeat - reduced as the button is held
+#define INPUT_REPEAT_START_INTERVAL 500
+
 // Callbacks for user input
 using ListCallback      = std::function<void(int selected)>;
 using PromptCallback    = std::function<void(int selected)>;
@@ -263,6 +266,7 @@ class DisplayManager {
     bool initialized                                  = false;
 
     inline void setComponent(ComponentType component);
+    inline ComponentType getComponent();
 
     // Helper for calculating list bounds and state
     ListBounds getListBounds(std::vector<std::string> items, int selectedIndex);
@@ -285,6 +289,8 @@ class DisplayManager {
     // Components and state
     TouchEventType inputState[HANDSHAKE_COUNT]   = {TOUCH_UP, TOUCH_UP, TOUCH_UP, TOUCH_UP};
     unsigned long holdStartTime[HANDSHAKE_COUNT] = {0, 0, 0, 0};
+    unsigned long repeatCount[HANDSHAKE_COUNT]   = {0, 0, 0, 0};
+    unsigned long repeatDelay                    = INPUT_REPEAT_START_INTERVAL;
     ComponentType currentComponent;
     ListState listState;
     PromptState promptState;
