@@ -18,7 +18,7 @@
 #define UPPER_LED_COUNT           9
 #define UPPER_LED_TYPE            WS2812
 #define UPPER_LED_COLOR_ORDER     GRB
-#define UPPER_LED_BASE_BRIGHTNESS 255
+#define UPPER_LED_BASE_BRIGHTNESS 175
 #define UPPER_LED_SPEED           8
 
 // Lower "Auto Revelator" addressable LED strip
@@ -26,7 +26,7 @@
 #define LOWER_LED_COUNT           13
 #define LOWER_LED_TYPE            WS2812
 #define LOWER_LED_COLOR_ORDER     GRB
-#define LOWER_LED_BASE_BRIGHTNESS 255
+#define LOWER_LED_BASE_BRIGHTNESS 175
 #define LOWER_LED_SPEED           8
 
 // Main board LED strip
@@ -34,7 +34,7 @@
 #define MAIN_LED_COUNT           12
 #define MAIN_LED_TYPE            WS2812
 #define MAIN_LED_COLOR_ORDER     GRB
-#define MAIN_LED_BASE_BRIGHTNESS 100
+#define MAIN_LED_BASE_BRIGHTNESS 50
 #define MAIN_LED_SPEED           8
 
 // Touch button addressable LED strip
@@ -42,7 +42,7 @@
 #define TOUCH_LED_COUNT           4
 #define TOUCH_LED_TYPE            WS2812
 #define TOUCH_LED_COLOR_ORDER     GRB
-#define TOUCH_LED_BASE_BRIGHTNESS 255
+#define TOUCH_LED_BASE_BRIGHTNESS 175
 #define TOUCH_LED_SPEED           8
 
 // Non-addressable LED pins
