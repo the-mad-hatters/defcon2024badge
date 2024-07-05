@@ -81,7 +81,7 @@ class HomeMode : public BadgeMode {
             {"Drunk as Hell",       [this]() { return setScene(SceneType::DRUNK_AS_HELL); }},
             {"Gone Clear",          [this]() { return setScene(SceneType::GONE_CLEAR);}},
             {"American Jesus",      [this]() { return setScene(SceneType::AMERICAN_JESUS);}},
-            {"DEF CON 32",          [this]() { return setScene(SceneType::DC32_Y2K_AESTHETIC); }},
+            {"DC 32",               [this]() { return setScene(SceneType::DC32_Y2K_AESTHETIC); }},
         };
 
         // Define the top-level menu
