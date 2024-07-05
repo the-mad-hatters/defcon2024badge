@@ -77,6 +77,9 @@ class HomeMode : public BadgeMode {
             {"Gone to Hell",        [this]() { return setScene(SceneType::GONE_TO_HELL); }},
             {"Secret Combinations", [this]() { return setScene(SceneType::SECRET_COMBINATIONS); }},
             {"The Salamander",      [this]() { return setScene(SceneType::THE_SALAMANDER); }},
+            {"Tapir Joyride",       [this]() { return setScene(SceneType::TAPIR_JOYRIDE); }},
+            {"Suppressive Badge",   [this]() { return setScene(SceneType::SUPPRESSIVE_BADGE); }},
+            {"Thetan Possession",   [this]() { return setScene(SceneType::THETAN_POSSESSION); }},
             {"Seer Stones",         [this]() { return setScene(SceneType::SEER_STONES); }},
             {"Drunk as Hell",       [this]() { return setScene(SceneType::DRUNK_AS_HELL); }},
             {"Gone Clear",          [this]() { return setScene(SceneType::GONE_CLEAR);}},
@@ -125,7 +128,7 @@ class HomeMode : public BadgeMode {
 
     bool setScene(SceneType scene) {
         leds->setScene(scene);
-        return true;
+        return false;
     }
 
     bool setMode(ModeType mode) {
@@ -211,7 +214,7 @@ class HomeMode : public BadgeMode {
         self->inMenu = false;
 
         // Start the LEDs
-        ESP_LOGD(TAG_HOMEMODE, "Starting LED scene: GOING_TO_HELL");
+        ESP_LOGD(TAG_HOMEMODE, "DC 32");
         self->leds->clear(true);
         self->leds->setScene(SceneType::DC32_Y2K_AESTHETIC);
 

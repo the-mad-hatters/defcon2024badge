@@ -53,11 +53,32 @@ void SceneManager::init() {
         SceneConfigMapAddressable{
             {AddressableStrip::UPPER, SceneConfigAddressable(the_salamander_p, 0, UPPER_LED_BASE_BRIGHTNESS, 20, ScenePattern::PALETTE_FILL)},
             {AddressableStrip::LOWER, SceneConfigAddressable(the_salamander_p, 0, LOWER_LED_BASE_BRIGHTNESS, 20, ScenePattern::PALETTE_FILL)},
-            {AddressableStrip::MAIN,  SceneConfigAddressable(the_salamander_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(the_salamander_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
             {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Green, 0, TOUCH_LED_BASE_BRIGHTNESS, 200, ScenePattern::COLOR_CYCLE)},
         },
         SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
     );
+   
+    scenes[SceneType::TAPIR_JOYRIDE] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(tapir_joyride_p, 0, UPPER_LED_BASE_BRIGHTNESS, 15, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(tapir_joyride_p, 0, LOWER_LED_BASE_BRIGHTNESS, 15, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(tapir_joyride_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 10, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Orange, 0, TOUCH_LED_BASE_BRIGHTNESS, 250, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+
+    scenes[SceneType::SUPPRESSIVE_BADGE] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(suppressive_badge_p, 0, UPPER_LED_BASE_BRIGHTNESS, 5, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(suppressive_badge_p, 0, LOWER_LED_BASE_BRIGHTNESS, 5, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(suppressive_badge_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 5, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Gold, 0, TOUCH_LED_BASE_BRIGHTNESS, 150, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+
     scenes[SceneType::SEER_STONES] = std::make_unique<Scene>(
         SceneConfigMapAddressable{
             {AddressableStrip::UPPER, SceneConfigAddressable(seer_stones_p, 0, UPPER_LED_BASE_BRIGHTNESS, 8, ScenePattern::PALETTE_FILL)},
@@ -67,6 +88,17 @@ void SceneManager::init() {
         },
         SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
     );
+
+    scenes[SceneType::THETAN_POSSESSION] = std::make_unique<Scene>(
+        SceneConfigMapAddressable{
+            {AddressableStrip::UPPER, SceneConfigAddressable(thetan_possession_p, 0, UPPER_LED_BASE_BRIGHTNESS, 5, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::LOWER, SceneConfigAddressable(thetan_possession_p, 0, LOWER_LED_BASE_BRIGHTNESS, 5, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::MAIN,  SceneConfigAddressable(thetan_possession_main_p, 0, MAIN_LED_BASE_BRIGHTNESS, 15, ScenePattern::PALETTE_FILL)},
+            {AddressableStrip::TOUCH, SceneConfigAddressable(CRGB::Red, 0, TOUCH_LED_BASE_BRIGHTNESS, 200, ScenePattern::COLOR_CYCLE)},
+        },
+        SceneConfigNonAddr{250, ScenePatternNonAddr::RANDOM}
+    );
+
     scenes[SceneType::DRUNK_AS_HELL] = std::make_unique<Scene>(
         SceneConfigMapAddressable{
             {AddressableStrip::UPPER, SceneConfigAddressable(drunk_as_hell_p, 0, UPPER_LED_BASE_BRIGHTNESS, 2, ScenePattern::PALETTE_FILL)},
