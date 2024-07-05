@@ -3,7 +3,8 @@
 // Include all modes
 #include "modes/Home.hpp"
 #include "modes/Truth.hpp"
-
+#include "modes/Revelation.hpp"
+#include "modes/Magic8Ball.hpp"
 #include "modes/Handle.hpp"
 
 static const char *TAG = "BadgeManager";
@@ -30,9 +31,10 @@ void Badge::init() {
     leds.init();
 
     // Initialize all modes here
-    modes[ModeType::HOME]  = std::make_unique<HomeMode>(&display, &leds, &touch);
-    modes[ModeType::TRUTH] = std::make_unique<TruthMode>(&display, &leds, &touch);
-
+    modes[ModeType::HOME]           = std::make_unique<HomeMode>(&display, &leds, &touch);
+    modes[ModeType::TRUTH]          = std::make_unique<TruthMode>(&display, &leds, &touch);
+    modes[ModeType::REVELATION]     = std::make_unique<RevelationMode>(&display, &leds, &touch);
+    modes[ModeType::MAGIC_8BALL]    = std::make_unique<Magic8BallMode>(&display, &leds, &touch);
     modes[ModeType::DISPLAY_HANDLE] = std::make_unique<HandleMode>(&display, &leds, &touch);
 
     // DEBUG: Print all modes and their addresses

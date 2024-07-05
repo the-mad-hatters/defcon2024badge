@@ -1,6 +1,8 @@
 #include "Scene.h"
 #include "led/LedHandler.h"
 
+static const char *TAG = "Scene";
+
 Scene::Scene(const SceneConfigMapAddressable &addressableConfig,
              const SceneConfigNonAddr &nonAddrConfig)
     : leds(LedHandler::getInstance())
@@ -25,7 +27,7 @@ void Scene::tick() {
                 case ScenePattern::PALETTE_FILL:
                     updateLedsWithPalette(strip, config.colorConfig.palette, config.startIndex,
                                           config.brightness);
-                    config.startIndex = (config.startIndex + 1) % LedCounts[strip];
+                    config.startIndex++;
                     break;
                 case ScenePattern::COLOR_CYCLE:
                     updateLedsCycleColorNext(strip, config.colorConfig.color, config.startIndex,

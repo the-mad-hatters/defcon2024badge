@@ -35,6 +35,22 @@ void DisplayManager::getDisplaySize(int &width, int &height) {
     height = displayHeight;
 }
 
+int DisplayManager::getDisplayWidth() {
+    std::lock_guard<std::mutex> lock(displayMutex);
+    if (displayWidth == 0) {
+        displayWidth = u8g2.getDisplayWidth();
+    }
+    return displayWidth;
+}
+
+int DisplayManager::getDisplayHeight() {
+    std::lock_guard<std::mutex> lock(displayMutex);
+    if (displayHeight == 0) {
+        displayHeight = u8g2.getDisplayHeight();
+    }
+    return displayHeight;
+}
+
 DisplayManager::TextBounds DisplayManager::getTextBounds(const uint8_t *font, const char *text) {
     TextBounds bounds;
 
@@ -540,29 +556,40 @@ void DisplayManager::scrollText(const char *text) {
     xQueueReset(textScrollEvents);
 
     // Set the scroll parameters
-    scrollState.text      = text;
-    scrollState.scrolling = true;
+    scrollState.text = text;
 
     // Create the scroll task
     if (!scrollTaskHandle) {
         ESP_LOGD(TAG, "Creating scroll task");
         xTaskCreate(scrollTask, "ScrollTask", 2048, this, 5, &scrollTaskHandle);
     }
+    xTaskNotifyGive(scrollTaskHandle);
 }
 
 void DisplayManager::scrollTask(void *pvParameters) {
     DisplayManager *self = static_cast<DisplayManager *>(pvParameters);
     ESP_LOGD(TAG, "Scroll task started. Task: %p, Priority: %d", self->scrollTaskHandle,
              uxTaskPriorityGet(NULL));
-    self->doScrollText();
-    ESP_LOGD(TAG, "Scroll task complete... cleaning up");
-    self->scrollState.scrolling = false;
-    self->scrollTaskHandle      = NULL;
-    if (TaskHandle_t haltingTask = scrollHaltNotify.load()) {
-        scrollHaltNotify.store(nullptr);
-        xTaskNotifyGive(haltingTask);
+
+    while (true) {
+        // Wait for a notification to start scrolling
+        if (!self->scrollState.scrolling) {
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            ESP_LOGD(TAG, "Received scroll notification - calling doScrollText()");
+            self->scrollState.scrolling = true;
+            self->doScrollText();
+            self->scrollState.scrolling = false;
+            ESP_LOGD(TAG, "Scrolling complete");
+        }
+
+        // If requested, notify the requesting task that we have stopped scrolling
+        if (TaskHandle_t requestingTask = scrollHaltNotify.load()) {
+            ESP_LOGD(TAG, "Notifying task %p that we have stopped scrolling", requestingTask);
+            scrollHaltNotify.store(nullptr);
+            xTaskNotifyGive(requestingTask);
+        }
+        esp_task_wdt_reset();
     }
-    vTaskDelete(NULL);
 }
 
 void DisplayManager::doScrollText() {
@@ -580,7 +607,10 @@ void DisplayManager::doScrollText() {
         }
     }
 
-    for (int i = 0; i < scrollState.iterations || scrollState.iterations == SCROLL_FOREVER; i++) {
+    // Calculate the number of pixels to adjust the offset by based on the speed
+    int scrollDistance = scrollState.speed / 10;
+
+    for (int i = 0; i < scrollState.iterations || scrollState.iterations == SCROLL_FOREVER; ++i) {
         // Send a scroll start event
         ScrollEvent startEvent = {
             .type = ScrollEventType::SCROLL_START,
@@ -588,7 +618,8 @@ void DisplayManager::doScrollText() {
         xQueueSend(textScrollEvents, &startEvent, 0);
 
         // Scroll the text across the display
-        for (int offset = 0; offset < bounds.width + displayWidth; offset++) {
+        for (int offset = 0; offset <= bounds.width + displayWidth + scrollDistance;
+             offset += scrollDistance) {
             if (!scrollState.scrolling) {
                 return;
             }
@@ -610,9 +641,7 @@ void DisplayManager::doScrollText() {
             if (scrollHaltNotify.load()) {
                 return;
             }
-
-            // Delay to control the scroll speed
-            vTaskDelay(scrollState.speed / portTICK_PERIOD_MS);
+            vTaskDelay(500 / scrollState.speed / portTICK_PERIOD_MS);
         }
 
         // Send a scroll end event
@@ -629,22 +658,24 @@ void DisplayManager::doScrollText() {
 }
 
 void DisplayManager::stopAnimations() {
-    // ESP_LOGD(TAG, "Stopping animations");
-    // Stop any scrolling text
-    if (scrollTaskHandle) {
-        ESP_LOGD(TAG, "Cleaning up scroll task");
+    if (scrollState.scrolling) {
+        ESP_LOGD(TAG, "Stopping scroll animation...");
 
-        // Notify the task to stop and wait for it to exit
+        // Notify the task to stop and wait for confirmation
         scrollHaltNotify.store(xTaskGetCurrentTaskHandle());
+        ESP_LOGD(TAG, "Notified scroll task to stop scrolling... waiting for confirmation");
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ESP_LOGD(TAG, "Confirmation received");
 
         // Send a scroll cancel event
         ScrollEvent event = {
             .type = ScrollEventType::SCROLL_CANCEL,
         };
         xQueueSend(textScrollEvents, &event, 0);
+
+        // Set the scrolling state to false
+        scrollState.scrolling = false;
     }
-    scrollState.scrolling = false;
 }
 
 inline void DisplayManager::setComponent(ComponentType component) {

@@ -1,7 +1,9 @@
 #ifndef LED_BASE_H
 #define LED_BASE_H
 
-#define FASTLED_INTERNAL // Disable pragma message
+#ifndef FASTLED_INTERNAL
+    #define FASTLED_INTERNAL // Disable pragma message
+#endif
 
 #include <unordered_map>
 #include "FastLED.h"

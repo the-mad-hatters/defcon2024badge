@@ -48,6 +48,8 @@ class TouchHandler {
     void init();
     static void touchTask(void *pvParameters);
 
+    void clearEvents();
+
   private:
     TouchHandler()                                = default;
     TouchHandler(const TouchHandler &)            = delete;

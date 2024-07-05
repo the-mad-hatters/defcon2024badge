@@ -92,7 +92,16 @@ class DisplayManager {
         std::lock_guard<std::mutex> lock(displayMutex);
         textEntryState.availableChars = availableChars;
     }
+    // Scroll speed from 1-100
     void setScrollSpeed(int speed) {
+        if (speed > 100) {
+            ESP_LOGW("DisplayManager", "Capping scroll speed to 100");
+            speed = 100;
+        }
+        if (speed < 1) {
+            ESP_LOGW("DisplayManager", "Setting scroll speed to 1");
+            speed = 1;
+        }
         std::lock_guard<std::mutex> lock(displayMutex);
         scrollState.speed = speed;
     }
@@ -110,6 +119,8 @@ class DisplayManager {
     // ----------------------------------------------------------------------------------------- //
 
     void getDisplaySize(int &width, int &height);
+    int getDisplayWidth();
+    int getDisplayHeight();
     TextBounds getTextBounds(const uint8_t *font, const char *text);
 
     // ----------------------------------------------------------------------------------------- //

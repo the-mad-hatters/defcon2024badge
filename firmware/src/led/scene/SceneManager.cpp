@@ -130,6 +130,6 @@ void SceneManager::sceneTask(void *pvParameters) {
         if (self->currentScene) {
             self->currentScene->tick();
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(1 / portTICK_PERIOD_MS);
     }
 }

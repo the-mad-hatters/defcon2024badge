@@ -69,14 +69,12 @@ class HandleMode : public BadgeMode {
     }
 
     void showHandle() {
-        int width = 0, height = 0;
-        display->getDisplaySize(width, height);
         DisplayManager::TextBounds bounds =
             display->getTextBounds(u8g2_font_lubB14_tf, handle.c_str());
         display->setFont(u8g2_font_lubB14_tf);
 
         // If the handle is too long for the display, scroll it instead
-        if (bounds.width > width) {
+        if (bounds.width > display->getDisplayWidth()) {
             display->setScrollAlignment(SCROLL_ALIGN_MIDDLE);
             display->setScrollSpeed(10);
             display->setScrollIterations(SCROLL_FOREVER);
@@ -99,7 +97,6 @@ class HandleMode : public BadgeMode {
 
   private:
     TaskHandle_t handleTaskHandle;
-    // char handle[MAX_HANDLE_LENGTH];
     std::string handle;
 
     void initEEPROM() {

@@ -82,3 +82,7 @@ void TouchHandler::touchTask(void *pvParameters) {
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
+
+void TouchHandler::clearEvents() {
+    xQueueReset(touchQueue);
+}
