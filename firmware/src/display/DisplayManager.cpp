@@ -570,7 +570,6 @@ void DisplayManager::scrollTask(void *pvParameters) {
         // Wait for a notification to start scrolling
         if (!self->scrollState.scrolling) {
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-            ESP_LOGD(TAG, "Received scroll notification - calling doScrollText()");
             self->scrollState.scrolling = true;
             self->doScrollText();
             self->scrollState.scrolling = false;
@@ -588,7 +587,7 @@ void DisplayManager::scrollTask(void *pvParameters) {
 }
 
 void DisplayManager::doScrollText() {
-    TextBounds bounds = getTextBounds(font, scrollState.text);
+    TextBounds bounds = getTextBounds(font, scrollState.text.c_str());
     int scrollX = 0, scrollY = 0;
     {
         std::lock_guard<std::mutex> lock(displayMutex);
@@ -625,7 +624,7 @@ void DisplayManager::doScrollText() {
                     do {
                         u8g2.clearBuffer();
                         u8g2.setFontPosTop();
-                        u8g2.drawStr(scrollX - offset, scrollY, scrollState.text);
+                        u8g2.drawStr(scrollX - offset, scrollY, scrollState.text.c_str());
                     } while (u8g2.nextPage());
                 }
                 xSemaphoreGive(peripheralSync);

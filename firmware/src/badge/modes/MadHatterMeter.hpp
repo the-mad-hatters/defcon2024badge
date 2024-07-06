@@ -27,7 +27,7 @@ class MadHatterMeterMode : public MessageMode {
         resetState();
         if (!taskHandle) {
             ESP_LOGD(TAG_MADHATTERMETER, "Starting Mad Hatter Meter state manager task");
-            xTaskCreate(stateManagerTask, "Mad Hatter Meter State Manager Task", 4096, this, 5, NULL);
+            xTaskCreate(stateManagerTask, "MadHatterMeter:stateManagerTask", 4096, this, 5, NULL);
         }
     }
 
@@ -59,10 +59,6 @@ class MadHatterMeterMode : public MessageMode {
                 ESP_LOGD(TAG_MADHATTERMETER, "Calibration activated");
                 setState(State::CALIBRATING);
             }
-            touchEvents.push_back(event);
-            if (touchEvents.size() > touchEventBufferSizeMax) {
-                touchEvents.pop_front();
-            }
         }
     }
 
@@ -80,10 +76,8 @@ class MadHatterMeterMode : public MessageMode {
     TouchEventType (&inputStates)[HANDSHAKE_COUNT];
     std::mutex stateMutex;
     State state;
-    std::deque<TouchEvent> touchEvents;
     int initialAverage;
     double initialStandardDeviation;
-    std::vector<std::string> messages;
 
     static void stateManagerTask(void *pvParameters) {
         MadHatterMeterMode *self = static_cast<MadHatterMeterMode *>(pvParameters);
@@ -102,6 +96,7 @@ class MadHatterMeterMode : public MessageMode {
     }
 
     void handleState() {
+        // Update state to match the currently set state
         switch (getState()) {
             case State::WAITING: {
                 // Get configured handshakes for calibration and audit
@@ -109,7 +104,7 @@ class MadHatterMeterMode : public MessageMode {
                 for (int pin : eMeterPins) {
                     handshakeIds.push_back(handshakePins.right(pin) + 1);
                 }
-                std::string handshakeDesc = "Enter hanshakes " + join(handshakeIds, " and ") + " to  begin...";
+                std::string handshakeDesc = "Enter handshakes " + join(handshakeIds, " and ") + " to  begin...";
 
                 // Scroll instructions so that user knows what to do
                 display->setFont(MESSAGE_FONT);
@@ -121,8 +116,9 @@ class MadHatterMeterMode : public MessageMode {
             case State::CALIBRATING:
                 display->setFont(MESSAGE_FONT);
                 display->showTextCentered("Calibrating...");
-                initializeEMeter();
-                setState(State::AUDITING);
+                if (initializeEMeter()) {
+                    setState(State::AUDITING);
+                }
                 break;
             case State::AUDITING: {
                 display->setFont(MESSAGE_FONT);
@@ -147,13 +143,12 @@ class MadHatterMeterMode : public MessageMode {
     }
 
     void resetState() {
-        touchEvents.clear();
         initialAverage           = 0;
         initialStandardDeviation = 0;
         setState(State::WAITING);
     }
 
-    void initializeEMeter() {
+    bool initializeEMeter() {
         const int numInitialReadings = 100;
         std::vector<int> initialReadings;
         {
@@ -161,14 +156,18 @@ class MadHatterMeterMode : public MessageMode {
             for (int i = 0; i < numInitialReadings; ++i) {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 std::lock_guard<std::mutex> lock(touchMutex);
-                for (const auto &event : touchEvents) {
-                    if (std::any_of(eMeterPins.begin(), eMeterPins.end(),
-                                    [event](int pin) { return event.pin == pin; })) {
-                        initialReadings.push_back(event.value);
-                        if (initialReadings.size() >= numInitialReadings) {
-                            break;
-                        }
+                if (std::all_of(eMeterPins.begin(), eMeterPins.end(),
+                                [this](int pin) { return inputStates[handshakePins.right(pin)] == TOUCH_DOWN; })) {
+                    int touchReading = 0;
+                    for (auto pin : eMeterPins) {
+                        touchReading += latestEvents[handshakePins.right(pin)].value;
                     }
+                    initialReadings.push_back(touchReading);
+                } else {
+                    display->showTextCentered("Calibration\nfailed");
+                    vTaskDelay(1000 / portTICK_PERIOD_MS);
+                    resetState();
+                    return false;
                 }
             }
         }
@@ -177,11 +176,13 @@ class MadHatterMeterMode : public MessageMode {
         initialStandardDeviation = calculateStandardDeviation(initialReadings, initialAverage);
 
         ESP_LOGI(TAG_MADHATTERMETER, "Initial Average: %d", initialAverage);
-        ESP_LOGI(TAG_MADHATTERMETER, "Initial Standard Deviation: %f", initialStandardDeviation);
+        ESP_LOGI(TAG_MADHATTERMETER, "Initial Standard Deviation: %d", initialStandardDeviation);
 
         display->showTextCentered("Calibrated");
         leds->lockLed(AddressableStrip::TOUCH, 3, CRGB::Green);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+        return true;
     }
 
     void performEMeterAudit() {
@@ -191,14 +192,20 @@ class MadHatterMeterMode : public MessageMode {
         while (std::all_of(eMeterPins.begin(), eMeterPins.end(),
                            [this](int pin) { return inputStates[handshakePins.right(pin)] == TOUCH_DOWN; })) {
             ESP_LOGD(TAG_MADHATTERMETER, "Performing audit");
-            int touchReading = getAverageTouchReading();
+            int touchReading = 0;
+            {
+                std::lock_guard<std::mutex> lock(touchMutex);
+                for (auto pin : eMeterPins) {
+                    touchReading += latestEvents[handshakePins.right(pin)].value;
+                }
+            }
 
             double lowerBound = initialAverage - 3 * initialStandardDeviation;
             double upperBound = initialAverage + 3 * initialStandardDeviation;
 
             ESP_LOGD(TAG_MADHATTERMETER, "Touch reading: %d", touchReading);
-            ESP_LOGD(TAG_MADHATTERMETER, "Lower bound: %f", lowerBound);
-            ESP_LOGD(TAG_MADHATTERMETER, "Upper bound: %f", upperBound);
+            ESP_LOGD(TAG_MADHATTERMETER, "Lower bound: %d", lowerBound);
+            ESP_LOGD(TAG_MADHATTERMETER, "Upper bound: %d", upperBound);
 
             if (touchReading >= lowerBound && touchReading <= upperBound) {
                 leds->lockLed(AddressableStrip::TOUCH, 3, CRGB::Green);
@@ -210,7 +217,7 @@ class MadHatterMeterMode : public MessageMode {
                 }
 
                 if (setState && millis() - setStartTime >= 20000) {
-                    showRandomMessage();
+                    showAuditMessage();
                     setState = false;
                 }
             } else if (touchReading < lowerBound) {
@@ -227,20 +234,20 @@ class MadHatterMeterMode : public MessageMode {
         }
 
         leds->unlockLed(AddressableStrip::TOUCH, 3);
-        display->showTextCentered("Goodbye");
-    }
-
-    int getAverageTouchReading() {
-        std::lock_guard<std::mutex> lock(touchMutex);
-        int sum   = 0;
-        int count = 0;
-        for (const auto &event : touchEvents) {
-            if (std::any_of(eMeterPins.begin(), eMeterPins.end(), [event](int pin) { return event.pin == pin; })) {
-                sum += event.value;
-                count++;
+        display->setFont(MESSAGE_FONT);
+        display->setScrollSpeed(MESSAGE_SPEED);
+        display->setScrollIterations(1);
+        display->scrollText("Hands removed... restarting...");
+        ScrollEvent event;
+        while (true) {
+            if (xQueueReceive(textScrollEvents, &event, portMAX_DELAY) == pdTRUE) {
+                if (event.type == ScrollEventType::SCROLL_END) {
+                    break;
+                }
             }
         }
-        return count > 0 ? sum / count : 0;
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        resetState();
     }
 
     int calculateAverage(const std::vector<int> &readings) {
@@ -260,15 +267,26 @@ class MadHatterMeterMode : public MessageMode {
         return sqrt(variance);
     }
 
-    void showRandomMessage() {
+    void showAuditMessage() {
         if (messages.empty()) {
             ESP_LOGE(TAG_MADHATTERMETER, "No messages loaded");
             display->showTextCentered("No messages available");
             return;
         }
-        int index           = random(0, messages.size());
-        std::string message = messages[index];
-        display->scrollText(message.c_str());
+        int index = random(0, messages.size());
+        display->setFont(MESSAGE_FONT);
+        display->setScrollSpeed(MESSAGE_SPEED);
+        display->setScrollIterations(1);
+        display->scrollText(messages[index].c_str());
+        ScrollEvent event;
+        while (true) {
+            if (xQueueReceive(textScrollEvents, &event, portMAX_DELAY) == pdTRUE) {
+                if (event.type == ScrollEventType::SCROLL_END) {
+                    break;
+                }
+            }
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 };
 

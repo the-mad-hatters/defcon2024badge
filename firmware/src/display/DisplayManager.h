@@ -241,7 +241,7 @@ class DisplayManager {
 
     // State for scrolling text
     struct ScrollTextState {
-        const char *text;
+        std::string text;
         int speed;
         int iterations;
         int alignment;
@@ -270,7 +270,7 @@ class DisplayManager {
         , listState{std::vector<std::string>(), 0, nullptr}
         , promptState{"", std::vector<std::string>(), 0, nullptr}
         , textEntryState{"", "", CHAR_SET_ALL, 0, TextEntryAction::NONE, nullptr}
-        , scrollState{nullptr, 20, SCROLL_FOREVER, SCROLL_ALIGN_MIDDLE}
+        , scrollState{"", 20, SCROLL_FOREVER, SCROLL_ALIGN_MIDDLE}
         , scrollTaskHandle(NULL) {};
     DisplayManager(const DisplayManager &)            = delete;
     DisplayManager &operator=(const DisplayManager &) = delete;

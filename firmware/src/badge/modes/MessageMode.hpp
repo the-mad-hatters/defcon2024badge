@@ -7,8 +7,9 @@
 #include <fstream>
 #include <sstream>
 #include <SPIFFS.h>
-#include "badge/BadgeMode.h"
 #include "esp_log.h"
+#include "badge/BadgeMode.h"
+#include "sync.h"
 
 #define MESSAGE_SPEED        40
 #define MESSAGE_FONT         u8g2_font_ncenB10_tr
@@ -86,23 +87,31 @@ class MessageMode : public BadgeMode {
 
     void loadMessages(const char *path) {
         messages.clear();
-        if (!SPIFFS.exists(path)) {
-            ESP_LOGE(TAG_MESSAGEMODE, "Messages file not found: %s", path);
-            return;
-        }
-        File file = SPIFFS.open(path);
-        if (!file) {
-            ESP_LOGE(TAG_MESSAGEMODE, "Failed to open messages file: %s", path);
-            return;
-        }
 
-        while (file.available()) {
-            String line = file.readStringUntil('\n');
-            if (line.length() > 0) {
-                messages.push_back(line.c_str());
+        // Lock the peripheral mutex to prevent concurrent access
+        if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
+
+            if (!SPIFFS.exists(path)) {
+                ESP_LOGE(TAG_MESSAGEMODE, "Messages file not found: %s", path);
+                return;
             }
+            File file = SPIFFS.open(path);
+            if (!file) {
+                ESP_LOGE(TAG_MESSAGEMODE, "Failed to open messages file: %s", path);
+                return;
+            }
+
+            while (file.available()) {
+                String line = file.readStringUntil('\n');
+                if (line.length() > 0) {
+                    messages.push_back(line.c_str());
+                }
+            }
+            file.close();
+
+            // Release the peripheral mutex
+            xSemaphoreGive(peripheralSync);
         }
-        file.close();
 
         if (messages.empty()) {
             ESP_LOGE(TAG_MESSAGEMODE, "No messages loaded from %s", path);
