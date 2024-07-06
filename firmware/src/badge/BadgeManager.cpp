@@ -5,6 +5,7 @@
 #include "modes/Truth.hpp"
 #include "modes/Revelation.hpp"
 #include "modes/Magic8Ball.hpp"
+#include "modes/MadHatterMeter.hpp"
 #include "modes/Handle.hpp"
 
 static const char *TAG = "BadgeManager";
@@ -31,11 +32,12 @@ void Badge::init() {
     leds.init();
 
     // Initialize all modes here
-    modes[ModeType::HOME]           = std::make_unique<HomeMode>(&display, &leds, &touch);
-    modes[ModeType::TRUTH]          = std::make_unique<TruthMode>(&display, &leds, &touch);
-    modes[ModeType::REVELATION]     = std::make_unique<RevelationMode>(&display, &leds, &touch);
-    modes[ModeType::MAGIC_8BALL]    = std::make_unique<Magic8BallMode>(&display, &leds, &touch);
-    modes[ModeType::DISPLAY_HANDLE] = std::make_unique<HandleMode>(&display, &leds, &touch);
+    modes[ModeType::HOME]             = std::make_unique<HomeMode>();
+    modes[ModeType::TRUTH]            = std::make_unique<TruthMode>();
+    modes[ModeType::REVELATION]       = std::make_unique<RevelationMode>();
+    modes[ModeType::MAGIC_8BALL]      = std::make_unique<Magic8BallMode>();
+    modes[ModeType::MAD_HATTER_METER] = std::make_unique<MadHatterMeterMode>();
+    modes[ModeType::DISPLAY_HANDLE]   = std::make_unique<HandleMode>();
 
     // DEBUG: Print all modes and their addresses
     if (CORE_DEBUG_LEVEL >= 4) {
@@ -53,57 +55,70 @@ void Badge::init() {
     xTaskCreate(modeManagerTask, "ModeManagerTask", 2048, this, 5, NULL);
 }
 
+void Badge::flashLedStrip(AddressableStrip strip, CRGB color, int count, int duration) {
+    for (int i = 0; i < count; ++i) {
+        // Turn the LEDs on
+        for (int j = 0; j < LedCounts[strip]; ++j) {
+            leds.lockLed(strip, handshakeLeds.right(j), color);
+        }
+        leds.show();
+        vTaskDelay(duration / count / 2 / portTICK_PERIOD_MS);
+
+        // Turn the LEDs off
+        for (int j = 0; j < LedCounts[strip]; ++j) {
+            leds.lockLed(strip, handshakeLeds.right(j), CRGB::Black);
+        }
+        leds.show();
+        vTaskDelay(duration / count / 2 / portTICK_PERIOD_MS);
+    }
+    // Unlock the LEDs once we're done flashing them
+    for (int j = 0; j < LedCounts[strip]; ++j) {
+        leds.unlockLed(strip, handshakeLeds.right(j));
+    }
+}
+
 void Badge::modeInputTask(void *pvParameters) {
     Badge *self = static_cast<Badge *>(pvParameters);
     TouchEvent event;
-    bool holdingToExit          = false;
-    unsigned long holdStartTime = 0;
-    unsigned long exitHoldTime  = 2000;
+    TouchEvent(&latestEvents)[HANDSHAKE_COUNT] = self->touch.getLatestEvents();
+
+    const int exitPin          = HANDSHAKE_1;
+    bool holdingToExit         = false;
+    unsigned long exitHoldTime = 1000;
 
     while (true) {
         if (touchQueue && xQueueReceive(touchQueue, &event, portMAX_DELAY) == pdTRUE) {
-            // Check if the handshake 1 is being held to exit the current mode
-            if (event.pin == HANDSHAKE_1) {
-                if (event.type == TOUCH_DOWN) {
+            // Check if _only_ handshake 1 is being held to exit the current mode
+            if (event.pin == exitPin) {
+                if (std::all_of(latestEvents, latestEvents + HANDSHAKE_COUNT,
+                                [](TouchEvent e) { return e.pin == exitPin || e.type == TOUCH_UP; })) {
                     if (!holdingToExit) {
                         holdingToExit = true;
-                        holdStartTime = millis();
-                    } else if (millis() - holdStartTime >= exitHoldTime) {
-                        ESP_LOGD(TAG, "Force exiting current mode");
+                    } else if (event.duration >= exitHoldTime) {
+                        holdingToExit = false;
+                        ESP_LOGD(TAG, "Exit to HOME requested");
                         {
                             std::lock_guard<std::mutex> lock(self->modeMutex);
                             if (self->currentMode) {
+                                if (self->currentMode->getType() == ModeType::HOME) {
+                                    ESP_LOGD(TAG, "Current mode is already HOME, not exiting");
+                                    continue;
+                                }
                                 self->currentMode->exit();
+                                self->currentMode = nullptr;
                             }
                         }
                         self->display.setFont(u8g2_font_crox5tb_tr);
                         self->display.showTextCentered("Exiting...");
                         self->display.setFont(NULL);
 
-                        // Flash the handshake LEDs blue 3 times over 1 second
-                        for (int j = 0; j < 3; ++j) {
-                            for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                                self->leds.lockLed(TOUCH, handshakeLeds.right(i), CRGB::Blue);
-                            }
-                            self->leds.show();
-                            vTaskDelay((1000 / 3 / 2) / portTICK_PERIOD_MS); // On duration
-                            for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                                self->leds.lockLed(TOUCH, handshakeLeds.right(i), CRGB::Black);
-                            }
-                            self->leds.show();
-                            vTaskDelay((1000 / 3 / 2) / portTICK_PERIOD_MS); // Off duration
-                        }
-                        // Unlock the LEDs
-                        for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                            self->leds.unlockLed(TOUCH, handshakeLeds.right(i));
-                        }
+                        // Flash handshake LEDs blue to indicate exiting
+                        self->flashLedStrip(AddressableStrip::TOUCH, CRGB::Blue, 3, 900);
 
                         // Return to menu
                         self->setMode(ModeType::HOME);
-
-                        holdingToExit = false;
                     }
-                } else if (event.type == TOUCH_UP) {
+                } else {
                     holdingToExit = false;
                 }
             }
@@ -138,6 +153,7 @@ void Badge::modeManagerTask(void *pvParameters) {
                 }
                 self->currentMode = self->modes[mode].get();
                 if (self->currentMode) {
+                    // Clear any touch events that may have been queued up
                     self->currentMode->enter();
                 }
             }

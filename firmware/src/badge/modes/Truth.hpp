@@ -7,19 +7,18 @@ static const char *TAG_TRUTHMODE = "TruthMode";
 
 class TruthMode : public MessageMode {
   public:
-    TruthMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch)
-        : MessageMode(display, leds, touch, "/truths.txt", "/truths_nsfw.txt") {
+    TruthMode() : MessageMode(ModeType::TRUTH, "/truths.txt", "/truths_nsfw.txt") {
     }
 
   protected:
-    void startTask() override {
+    void start() override {
         if (!taskHandle) {
             ESP_LOGD(TAG_TRUTHMODE, "Starting truth task");
             xTaskCreate(truthTask, "Truth Task", 2048, this, 5, &taskHandle);
         }
     }
 
-    void stopTask() override {
+    void stop() override {
         if (taskHandle) {
             ESP_LOGD(TAG_TRUTHMODE, "Stopping truth task");
             vTaskDelete(taskHandle);
@@ -38,7 +37,7 @@ class TruthMode : public MessageMode {
             ESP_LOGD(TAG_TRUTHMODE, "Displaying truth: %s", truth.c_str());
 
             self->display->setFont(MESSAGE_FONT);
-            self->display->setScrollSpeed(50);
+            self->display->setScrollSpeed(MESSAGE_SPEED);
             self->display->setScrollIterations(1);
             self->display->scrollText(truth.c_str());
 

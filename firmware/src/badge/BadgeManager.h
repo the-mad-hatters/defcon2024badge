@@ -20,12 +20,19 @@ class Badge {
         return instance;
     }
     void init();
-    static void modeInputTask(void *pvParameters);
-    static void modeManagerTask(void *pvParameters);
     void setMode(ModeType mode);
     BadgeMode *getMode();
     bool hasMode(ModeType mode);
-    void handleTouch(int pin);
+
+    /**
+     * @brief Flash an LED strip with a color given a count of flashes to do and a total duration
+     *
+     * @param strip The addressable strip to flash all LEDs on
+     * @param color The color to flash the LEDs
+     * @param count The number of times to flash the LEDs
+     * @param duration The total duration to flash the LEDs for
+     */
+    void flashLedStrip(AddressableStrip strip, CRGB color, int count = 1, int duration = 900);
 
   private:
     Badge()
@@ -35,6 +42,9 @@ class Badge {
         , leds(LedHandler::getInstance()) {};
     Badge(const Badge &)            = delete;
     Badge &operator=(const Badge &) = delete;
+
+    static void modeInputTask(void *pvParameters);
+    static void modeManagerTask(void *pvParameters);
 
     DisplayManager &display;
     TouchHandler &touch;

@@ -6,19 +6,6 @@
 #include "led/LedHandler.h"
 #include "touch/TouchHandler.h"
 
-class BadgeMode {
-  public:
-    virtual ~BadgeMode() {};
-    virtual void enter()                       = 0;
-    virtual void exit()                        = 0;
-    virtual void handleTouch(TouchEvent event) = 0;
-
-  protected:
-    DisplayManager *display;
-    LedHandler *leds;
-    TouchHandler *touch;
-};
-
 // List of modes
 enum class ModeType {
     HOME,
@@ -29,6 +16,30 @@ enum class ModeType {
     LED_MODES,
     DISPLAY_HANDLE,
     ABOUT,
+};
+
+class BadgeMode {
+  public:
+    BadgeMode(ModeType type)
+        : display(&DisplayManager::getInstance())
+        , leds(&LedHandler::getInstance())
+        , touch(&TouchHandler::getInstance())
+        , type(type) {};
+    BadgeMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch, ModeType type)
+        : display(display), leds(leds), touch(touch), type(type) {};
+    virtual ~BadgeMode() {};
+    ModeType getType() {
+        return type;
+    }
+    virtual void enter()                       = 0;
+    virtual void exit()                        = 0;
+    virtual void handleTouch(TouchEvent event) = 0;
+
+  protected:
+    DisplayManager *display;
+    LedHandler *leds;
+    TouchHandler *touch;
+    ModeType type;
 };
 
 // Menu items

@@ -155,16 +155,19 @@ void DisplayManager::showTextCentered(const char *text) {
     }
 }
 
-void DisplayManager::showList(const char *items[], int itemCount, int initialSelection,
-                              ListCallback callback) {
+void DisplayManager::showList(const char *items[], int itemCount, int initialSelection, ListCallback callback) {
+    allInputsReleased       = std::none_of(std::begin(inputStates), std::end(inputStates),
+                                           [](TouchEventType type) { return type == TOUCH_DOWN; });
     listState.items         = std::vector<std::string>(items, items + itemCount);
     listState.selectedIndex = initialSelection;
     listState.callback      = callback;
     renderList();
 }
 
-void DisplayManager::showPrompt(const char *prompt, const char *options[], int optionCount,
-                                int initialSelection, PromptCallback callback) {
+void DisplayManager::showPrompt(const char *prompt, const char *options[], int optionCount, int initialSelection,
+                                PromptCallback callback) {
+    allInputsReleased          = std::none_of(std::begin(inputStates), std::end(inputStates),
+                                              [](TouchEventType type) { return type == TOUCH_DOWN; });
     promptState.prompt         = prompt;
     promptState.options        = std::vector<std::string>(options, options + optionCount);
     promptState.selectedOption = initialSelection;
@@ -172,8 +175,10 @@ void DisplayManager::showPrompt(const char *prompt, const char *options[], int o
     renderPrompt();
 }
 
-void DisplayManager::showTextEntry(const char *prompt, const char *initialText,
-                                   const char initialCharSelected, TextEntryCallback callback) {
+void DisplayManager::showTextEntry(const char *prompt, const char *initialText, const char initialCharSelected,
+                                   TextEntryCallback callback) {
+    allInputsReleased          = std::none_of(std::begin(inputStates), std::end(inputStates),
+                                              [](TouchEventType type) { return type == TOUCH_DOWN; });
     textEntryState.prompt      = prompt;
     textEntryState.enteredText = initialText;
     textEntryState.callback    = callback;
@@ -200,9 +205,7 @@ void DisplayManager::renderList() {
         u8g2.firstPage();
         do {
             for (int i = scrollOffset;
-                 i < std::min(listState.items.size(),
-                              static_cast<std::size_t>(scrollOffset + itemsPerPage));
-                 i++) {
+                 i < std::min(listState.items.size(), static_cast<std::size_t>(scrollOffset + itemsPerPage)); i++) {
                 int y = (i - scrollOffset + 1) * bounds.items.itemHeight;
                 u8g2.setFont(font);
                 u8g2.drawStr(bounds.items.offset.x, y, listState.items[i].c_str());
@@ -224,9 +227,8 @@ void DisplayManager::renderPrompt() {
 
     // Calculate the list bounds and scroll offset
     ListBounds listBounds = getListBounds(promptState.options, promptState.selectedOption);
-    int itemsPerPage =
-        (displayHeight - promptBounds.height - promptPadding) / listBounds.items.itemHeight;
-    int scrollOffset = getListScrollOffset(promptState.selectedOption, itemsPerPage);
+    int itemsPerPage      = (displayHeight - promptBounds.height - promptPadding) / listBounds.items.itemHeight;
+    int scrollOffset      = getListScrollOffset(promptState.selectedOption, itemsPerPage);
 
     // Render the prompt
     stopAnimations();
@@ -243,19 +245,15 @@ void DisplayManager::renderPrompt() {
             // Draw options centered below the prompt
             int yOffset = listBounds.items.itemHeight;
             for (int i = scrollOffset;
-                 i < std::min(promptState.options.size(),
-                              static_cast<std::size_t>(scrollOffset + itemsPerPage));
-                 i++) {
-                int y = yOffset + (promptPadding * 2) +
-                        (i - scrollOffset) * listBounds.items.itemHeight;
+                 i < std::min(promptState.options.size(), static_cast<std::size_t>(scrollOffset + itemsPerPage)); i++) {
+                int y           = yOffset + (promptPadding * 2) + (i - scrollOffset) * listBounds.items.itemHeight;
                 int optionWidth = u8g2.getStrWidth(promptState.options[i].c_str());
                 int optionX     = std::max(0, (displayWidth - listBounds.items.width)) / 2;
                 u8g2.setFont(font);
                 u8g2.drawStr(optionX, y, promptState.options[i].c_str());
                 if (i == promptState.selectedOption) {
                     u8g2.setFont(u8g2_font_unifont_t_78_79);
-                    u8g2.drawUTF8(optionX - (listBounds.arrow.width + arrowPadding -
-                                             listBounds.arrow.offset.x),
+                    u8g2.drawUTF8(optionX - (listBounds.arrow.width + arrowPadding - listBounds.arrow.offset.x),
                                   y + listBounds.arrow.offset.y, arrowChar);
                 }
             }
@@ -286,8 +284,8 @@ void DisplayManager::renderTextEntry() {
     // Calculate the visible part of the character list
     int visibleChars = displayWidth / (selectedChar.width + selectorPadding);
     int visibleStart = std::max(0, textEntryState.selectedCharIndex - visibleChars / 2);
-    int visibleEnd   = std::min(textEntryState.availableChars.length(),
-                                static_cast<std::size_t>(visibleStart + visibleChars));
+    int visibleEnd =
+        std::min(textEntryState.availableChars.length(), static_cast<std::size_t>(visibleStart + visibleChars));
 
     // Ensure the selected character is visible
     if (textEntryState.selectedCharIndex < visibleStart) {
@@ -320,12 +318,10 @@ void DisplayManager::renderTextEntry() {
 
             // Draw available characters with selected character highlighted
             int selectionY = displayHeight - selectedChar.height - cursorPadding;
-            int selectionX =
-                (displayWidth - (selectedChar.width + selectorPadding) * visibleChars) / 2;
+            int selectionX = (displayWidth - (selectedChar.width + selectorPadding) * visibleChars) / 2;
 
             for (int i = visibleStart; i < visibleEnd; ++i) {
-                int charX =
-                    selectionX + (i - visibleStart) * (selectedChar.width + selectorPadding);
+                int charX          = selectionX + (i - visibleStart) * (selectedChar.width + selectorPadding);
                 char charToDraw[2] = {textEntryState.availableChars[i], '\0'};
 
                 if (i == textEntryState.selectedCharIndex) {
@@ -341,8 +337,7 @@ void DisplayManager::renderTextEntry() {
                     u8g2.setFont(font);
                     u8g2.setDrawColor(1);
                 } else {
-                    u8g2.drawStr(charX, selectionY + (selectedChar.height - entryBounds.height) / 2,
-                                 charToDraw);
+                    u8g2.drawStr(charX, selectionY + (selectedChar.height - entryBounds.height) / 2, charToDraw);
                 }
             }
         } while (u8g2.nextPage());
@@ -351,30 +346,37 @@ void DisplayManager::renderTextEntry() {
 }
 
 bool DisplayManager::handleTouch(TouchEvent event) {
-    // Track all input states so we can implement multi-touch actions
-    if (inputState[handshakePins.left(event.pin)] != event.type) {
-        inputState[handshakePins.left(event.pin)] = event.type;
+    // Check if all inputs are released
+    if (!allInputsReleased) {
+        allInputsReleased = std::none_of(std::begin(inputStates), std::end(inputStates),
+                                         [](TouchEventType type) { return type == TOUCH_DOWN; });
+        if (allInputsReleased) {
+            ESP_LOGD(TAG, "All inputs released... allowing components to handle touch events");
+            TouchHandler::getInstance().clearEvents();
+        } else {
+            return false;
+        }
     }
 
     // Track hold times for repeat actions and manage repeat state/delay values
     unsigned long currentTime = millis();
-    unsigned long holdTime    = holdStartTime[handshakePins.left(event.pin)] > 0
-                                    ? currentTime - holdStartTime[handshakePins.left(event.pin)]
+    unsigned long holdTime    = holdStartTime[handshakePins.right[event.pin]] > 0
+                                    ? currentTime - holdStartTime[handshakePins.right[event.pin]]
                                     : 0;
     bool repeatAction         = event.type == TOUCH_DOWN && holdTime >= repeatDelay;
     if (repeatAction) {
-        repeatCount[handshakePins.left(event.pin)]++;
-        if (repeatCount[handshakePins.left(event.pin)] >= 3) {
+        repeatCount[handshakePins.right[event.pin]]++;
+        if (repeatCount[handshakePins.right[event.pin]] >= 3) {
             repeatDelay = INPUT_REPEAT_START_INTERVAL / 3;
         }
     }
     if ((event.changed && event.type == TOUCH_DOWN) || repeatAction) {
-        holdStartTime[handshakePins.left(event.pin)] = currentTime;
+        holdStartTime[handshakePins.right[event.pin]] = currentTime;
     } else if (event.type == TOUCH_UP) {
-        if (holdStartTime[handshakePins.left(event.pin)] > 0) {
-            holdStartTime[handshakePins.left(event.pin)] = 0;
-            repeatCount[handshakePins.left(event.pin)]   = 0;
-            repeatDelay                                  = INPUT_REPEAT_START_INTERVAL;
+        if (holdStartTime[handshakePins.right[event.pin]] > 0) {
+            holdStartTime[handshakePins.right[event.pin]] = 0;
+            repeatCount[handshakePins.right[event.pin]]   = 0;
+            repeatDelay                                   = INPUT_REPEAT_START_INTERVAL;
         }
     }
 
@@ -392,8 +394,7 @@ bool DisplayManager::handleTouch(TouchEvent event) {
 
     // Unless it's a TOUCH_DOWN event or the component is in the needsUpDown list, we don't want
     // to handle the event
-    if (std::find(std::begin(needsUpDown), std::end(needsUpDown), getComponent()) ==
-            std::end(needsUpDown) &&
+    if (std::find(std::begin(needsUpDown), std::end(needsUpDown), getComponent()) == std::end(needsUpDown) &&
         (event.type != TOUCH_DOWN || (!event.changed && !repeatAction))) {
         return false;
     }
@@ -403,11 +404,11 @@ bool DisplayManager::handleTouch(TouchEvent event) {
     //     TAG,
     //     "Handling touch event: %d %s - Repeated: %s (%d), Hold: %dms (%d), States: %s %s %s %s",
     //     event.pin, event.type == TOUCH_DOWN ? "DOWN" : "UP", repeatAction ? "YES" : "NO",
-    //     repeatCount, holdTime, holdStartTime[handshakePins.left(event.pin)],
-    //     inputState[handshakePins.left(HANDSHAKE_1)] == TOUCH_DOWN ? "1" : "0",
-    //     inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_DOWN ? "1" : "0",
-    //     inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_DOWN ? "1" : "0",
-    //     inputState[handshakePins.left(HANDSHAKE_4)] == TOUCH_DOWN ? "1" : "0");
+    //     repeatCount, holdTime, holdStartTime[handshakePins.right[event.pin]],
+    //     inputState[handshakePins.right[HANDSHAKE_1]] == TOUCH_DOWN ? "1" : "0",
+    //     inputState[handshakePins.right[HANDSHAKE_2]] == TOUCH_DOWN ? "1" : "0",
+    //     inputState[handshakePins.right[HANDSHAKE_3]] == TOUCH_DOWN ? "1" : "0",
+    //     inputState[handshakePins.right[HANDSHAKE_4]] == TOUCH_DOWN ? "1" : "0");
 
     // By default don't let mode touch handlers run while we're showing/handling a component
     bool suppressModeHandler = (getComponent() != ComponentType::NONE);
@@ -448,13 +449,11 @@ bool DisplayManager::handleTouch(TouchEvent event) {
             } else if (event.pin == HANDSHAKE_2) {
                 ESP_LOGD(TAG, "Scrolling prompt up");
                 promptState.selectedOption =
-                    (promptState.selectedOption - 1 + promptState.options.size()) %
-                    promptState.options.size();
+                    (promptState.selectedOption - 1 + promptState.options.size()) % promptState.options.size();
                 renderPrompt();
             } else if (event.pin == HANDSHAKE_3) {
                 ESP_LOGD(TAG, "Scrolling prompt down");
-                promptState.selectedOption =
-                    (promptState.selectedOption + 1) % promptState.options.size();
+                promptState.selectedOption = (promptState.selectedOption + 1) % promptState.options.size();
                 renderPrompt();
             } else if (event.pin == HANDSHAKE_4) {
                 setComponent(ComponentType::NONE);
@@ -470,10 +469,10 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                 // Special case for handling "backspace" (handshakes 2 and 3 pressed together)
                 //
 
-                if (inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_DOWN &&
-                    inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_DOWN) {
-                    if (repeatCount[handshakePins.left(HANDSHAKE_2)] ==
-                        repeatCount[handshakePins.left(HANDSHAKE_3)]) {
+                if (inputStates[handshakePins.right[HANDSHAKE_2]] == TOUCH_DOWN &&
+                    inputStates[handshakePins.right[HANDSHAKE_3]] == TOUCH_DOWN) {
+                    if (repeatCount[handshakePins.right[HANDSHAKE_2]] ==
+                        repeatCount[handshakePins.right[HANDSHAKE_3]]) {
                         // Only handle the backspace action once per repeat cycle
                         if (textEntryState.action == TextEntryAction::BACKSPACE) {
                             break;
@@ -486,16 +485,16 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                     textEntryState.action = TextEntryAction::BACKSPACE;
                     break;
                 }
-                if (inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_UP ||
-                    inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_UP) {
+                if (inputStates[handshakePins.right[HANDSHAKE_2]] == TOUCH_UP ||
+                    inputStates[handshakePins.right[HANDSHAKE_3]] == TOUCH_UP) {
                     // Reset the repeat count if one of the backspace buttons is released
                     if (textEntryState.action == TextEntryAction::BACKSPACE) {
-                        repeatCount[handshakePins.left(HANDSHAKE_2)] = 0;
-                        repeatCount[handshakePins.left(HANDSHAKE_3)] = 0;
+                        repeatCount[handshakePins.right[HANDSHAKE_2]] = 0;
+                        repeatCount[handshakePins.right[HANDSHAKE_3]] = 0;
                     }
                 }
-                if (inputState[handshakePins.left(HANDSHAKE_2)] == TOUCH_UP &&
-                    inputState[handshakePins.left(HANDSHAKE_3)] == TOUCH_UP) {
+                if (inputStates[handshakePins.right[HANDSHAKE_2]] == TOUCH_UP &&
+                    inputStates[handshakePins.right[HANDSHAKE_3]] == TOUCH_UP) {
                     if (textEntryState.action == TextEntryAction::BACKSPACE) {
                         textEntryState.action = TextEntryAction::NONE;
                         break;
@@ -511,8 +510,7 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                     textEntryState.action = TextEntryAction::NONE;
                 }
                 // Handle the touch events
-                if (event.type == TOUCH_DOWN &&
-                    textEntryState.action != TextEntryAction::BACKSPACE) {
+                if (event.type == TOUCH_DOWN && textEntryState.action != TextEntryAction::BACKSPACE) {
                     if (event.pin == HANDSHAKE_1) {
                         setComponent(ComponentType::NONE);
                         textEntryState.action = TextEntryAction::NONE;
@@ -523,21 +521,19 @@ bool DisplayManager::handleTouch(TouchEvent event) {
                     } else if (event.pin == HANDSHAKE_2) {
                         ESP_LOGD(TAG, "Scrolling text entry left");
                         textEntryState.selectedCharIndex =
-                            (textEntryState.selectedCharIndex - 1 +
-                             textEntryState.availableChars.length()) %
+                            (textEntryState.selectedCharIndex - 1 + textEntryState.availableChars.length()) %
                             textEntryState.availableChars.length();
                         renderTextEntry();
                         textEntryState.action = TextEntryAction::LEFT;
                     } else if (event.pin == HANDSHAKE_3) {
                         ESP_LOGD(TAG, "Scrolling text entry right");
-                        textEntryState.selectedCharIndex = (textEntryState.selectedCharIndex + 1) %
-                                                           textEntryState.availableChars.length();
+                        textEntryState.selectedCharIndex =
+                            (textEntryState.selectedCharIndex + 1) % textEntryState.availableChars.length();
                         renderTextEntry();
                         textEntryState.action = TextEntryAction::RIGHT;
                     } else if (event.pin == HANDSHAKE_4) {
                         ESP_LOGD(TAG, "Selecting text entry character");
-                        textEntryState.enteredText +=
-                            textEntryState.availableChars[textEntryState.selectedCharIndex];
+                        textEntryState.enteredText += textEntryState.availableChars[textEntryState.selectedCharIndex];
                         renderTextEntry();
                         textEntryState.action = TextEntryAction::SELECT;
                     }
@@ -568,8 +564,7 @@ void DisplayManager::scrollText(const char *text) {
 
 void DisplayManager::scrollTask(void *pvParameters) {
     DisplayManager *self = static_cast<DisplayManager *>(pvParameters);
-    ESP_LOGD(TAG, "Scroll task started. Task: %p, Priority: %d", self->scrollTaskHandle,
-             uxTaskPriorityGet(NULL));
+    ESP_LOGD(TAG, "Scroll task started. Task: %p, Priority: %d", self->scrollTaskHandle, uxTaskPriorityGet(NULL));
 
     while (true) {
         // Wait for a notification to start scrolling
@@ -618,8 +613,7 @@ void DisplayManager::doScrollText() {
         xQueueSend(textScrollEvents, &startEvent, 0);
 
         // Scroll the text across the display
-        for (int offset = 0; offset <= bounds.width + displayWidth + scrollDistance;
-             offset += scrollDistance) {
+        for (int offset = 0; offset <= bounds.width + displayWidth + scrollDistance; offset += scrollDistance) {
             if (!scrollState.scrolling) {
                 return;
             }
@@ -681,6 +675,9 @@ void DisplayManager::stopAnimations() {
 inline void DisplayManager::setComponent(ComponentType component) {
     std::lock_guard<std::mutex> lock(displayMutex);
     currentComponent = component;
+    if (component == ComponentType::NONE) {
+        allInputsReleased = true;
+    }
 }
 
 inline DisplayManager::ComponentType DisplayManager::getComponent() {
@@ -688,8 +685,7 @@ inline DisplayManager::ComponentType DisplayManager::getComponent() {
     return currentComponent;
 }
 
-DisplayManager::ListBounds DisplayManager::getListBounds(std::vector<std::string> items,
-                                                         int selectedIndex) {
+DisplayManager::ListBounds DisplayManager::getListBounds(std::vector<std::string> items, int selectedIndex) {
     ListBounds bounds;
 
     // Get dimensions for the list items

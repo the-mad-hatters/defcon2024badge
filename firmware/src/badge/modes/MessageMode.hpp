@@ -1,6 +1,7 @@
 #ifndef MESSAGE_MODE_HPP
 #define MESSAGE_MODE_HPP
 
+#include <set>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -9,46 +10,64 @@
 #include "badge/BadgeMode.h"
 #include "esp_log.h"
 
-#define MESSAGE_FONT u8g2_font_ncenB10_tr
-#define PROMPT_FONT  u8g2_font_ncenB08_tr
+#define MESSAGE_SPEED        40
+#define MESSAGE_FONT         u8g2_font_ncenB10_tr
+#define PROMPT_FONT          u8g2_font_ncenB08_tr
+#define NSFW_ACTIVATION_TIME 1000
 
 static const char *TAG_MESSAGEMODE = "MessageMode";
 
 class MessageMode : public BadgeMode {
   public:
-    MessageMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch,
-                const char *normalFile, const char *nsfwFile)
-        : taskHandle(NULL), nsfwMode(false), normalFile(normalFile), nsfwFile(nsfwFile) {
-        this->display = display;
-        this->leds    = leds;
-        this->touch   = touch;
+    MessageMode(ModeType type, const char *normalFile, const char *nsfwFile,
+                const std::set<int> &nsfwPins = {HANDSHAKE_2, HANDSHAKE_3})
+        : BadgeMode(type)
+        , taskHandle(NULL)
+        , nsfwMode(false)
+        , normalFile(normalFile)
+        , nsfwFile(nsfwFile)
+        , inputStates(touch->getInputStates())
+        , latestEvents(touch->getLatestEvents()) {
+        // Initialize NSFW pins
+        NSFWPins.insert(nsfwPins.begin(), nsfwPins.end());
 
-        // Initialize input state and hold start time
-        for (int i = 0; i < HANDSHAKE_COUNT; i++) {
-            inputState[i]    = TOUCH_UP;
-            holdStartTime[i] = 0;
-        }
+        // Calculate non-NSFW pins
+        std::set<int> allPins = handshakePins.right.keys();
+        std::set_difference(allPins.begin(), allPins.end(), NSFWPins.begin(), NSFWPins.end(),
+                            std::inserter(nonNSFWPins, nonNSFWPins.begin()));
 
         // Load messages
         loadMessages(normalFile);
     }
 
     void enter() override {
-        startTask();
+        start();
     }
 
     void exit() override {
-        stopTask();
+        stop();
     }
 
     void handleTouch(TouchEvent event) override {
-        if (inputState[event.pin] != event.type) {
-            // Update the input state and hold start time
-            inputState[event.pin]    = event.type;
-            holdStartTime[event.pin] = event.type == TOUCH_UP ? 0 : millis();
+        // Exit early if the event is not for one of the NSFW pins
+        if (event.type != TOUCH_DOWN ||
+            std::none_of(std::begin(NSFWPins), std::end(NSFWPins), [event](int pin) { return pin == event.pin; })) {
+            return;
         }
 
-        handleNSFWToggle();
+        // Ensure no non-NSFW pins are touched
+        if (std::any_of(nonNSFWPins.begin(), nonNSFWPins.end(),
+                        [this](int pin) { return inputStates[handshakePins.right(pin)] == TOUCH_DOWN; })) {
+            return;
+        }
+
+        // If all NSFW pins are touched and the duration is long enough, activate NSFW mode
+        if (std::all_of(std::begin(NSFWPins), std::end(NSFWPins), [this](int pin) {
+                int index = handshakePins.right[pin];
+                return inputStates[index] == TOUCH_DOWN && latestEvents[index].duration > NSFW_ACTIVATION_TIME;
+            })) {
+            showNSFWPrompt();
+        }
     }
 
   protected:
@@ -57,11 +76,13 @@ class MessageMode : public BadgeMode {
     bool nsfwMode;
     const char *normalFile;
     const char *nsfwFile;
-    TouchEventType inputState[HANDSHAKE_COUNT];
-    unsigned long holdStartTime[HANDSHAKE_COUNT];
+    TouchEventType (&inputStates)[HANDSHAKE_COUNT];
+    TouchEvent (&latestEvents)[HANDSHAKE_COUNT];
+    std::set<int> NSFWPins;
+    std::set<int> nonNSFWPins;
 
-    virtual void startTask() = 0;
-    virtual void stopTask()  = 0;
+    virtual void start() = 0;
+    virtual void stop()  = 0;
 
     void loadMessages(const char *path) {
         messages.clear();
@@ -90,40 +111,26 @@ class MessageMode : public BadgeMode {
         }
     }
 
-    void handleNSFWToggle() {
-        if (inputState[HANDSHAKE_2] == TOUCH_DOWN && inputState[HANDSHAKE_3] == TOUCH_DOWN) {
-            if (holdStartTime[HANDSHAKE_2] == 0 || holdStartTime[HANDSHAKE_3] == 0) {
-                return;
-            }
-            unsigned long currentTime = millis();
-            if (currentTime - holdStartTime[HANDSHAKE_2] >= 1000 &&
-                currentTime - holdStartTime[HANDSHAKE_3] >= 1000) {
-                stopTask();
-                const char *options[] = {"Activate", "Deactivate"};
-                touch->clearEvents();
+    void showNSFWPrompt() {
+        stop();
+        const char *options[] = {"Activate", "Deactivate"};
+        display->setFont(PROMPT_FONT);
+        display->showPrompt("NSFW mode", options, 2, nsfwMode ? 1 : 0, [this](int index) {
+            // Set NSFW mode based on the selected index
+            bool previousNsfwMode = nsfwMode;
+            nsfwMode              = index == 0;
+
+            if (previousNsfwMode != nsfwMode) {
+                // Update the messages and display them accordingly
+                const char *message = nsfwMode ? "NSFW loading..." : "Back to safety";
                 display->setFont(PROMPT_FONT);
-                display->showPrompt("NSFW mode", options, 2, nsfwMode ? 1 : 0, [this](int index) {
-                    // Set NSFW mode based on the selected index
-                    bool previousNsfwMode = nsfwMode;
-                    nsfwMode              = index == 0;
-
-                    // Make sure we reset the hold start times
-                    holdStartTime[HANDSHAKE_2] = 0;
-                    holdStartTime[HANDSHAKE_3] = 0;
-
-                    if (previousNsfwMode != nsfwMode) {
-                        // Update the messages and display them accordingly
-                        const char *message = nsfwMode ? "NSFW loading..." : "Back to safety";
-                        display->setFont(PROMPT_FONT);
-                        display->showTextCentered(message);
-                        vTaskDelay(1500 / portTICK_PERIOD_MS); // Wait briefly so the message can be
-                                                               // read
-                        loadMessages(nsfwMode ? nsfwFile : normalFile);
-                    }
-                    startTask();
-                });
+                display->showTextCentered(message);
+                vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait briefly so the message can be
+                                                       // read
+                loadMessages(nsfwMode ? nsfwFile : normalFile);
             }
-        }
+            start();
+        });
     }
 
     std::string getRandomMessage() {

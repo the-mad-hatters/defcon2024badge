@@ -132,8 +132,8 @@ class DisplayManager {
     void showTextAt(const char *text, u8g2_uint_t x, u8g2_uint_t y);
     void showTextCentered(const char *text);
     void showList(const char *items[], int itemCount, int initialSelection, ListCallback callback);
-    void showPrompt(const char *prompt, const char *options[], int optionCount,
-                    int initialSelection, PromptCallback callback);
+    void showPrompt(const char *prompt, const char *options[], int optionCount, int initialSelection,
+                    PromptCallback callback);
     void showTextEntry(const char *prompt, const char *initialText, const char initialCharSelected,
                        TextEntryCallback callback);
 
@@ -265,7 +265,7 @@ class DisplayManager {
         , symbolFont(FONT_DEFAULT_SYMBOLS)
         , arrowChar(LIST_DEFAULT_ARROW_CHAR)
         , arrowPadding(4)
-        , inputState{TOUCH_UP, TOUCH_UP, TOUCH_UP, TOUCH_UP}
+        , inputStates(TouchHandler::getInstance().getInputStates())
         , currentComponent(ComponentType::NONE)
         , listState{std::vector<std::string>(), 0, nullptr}
         , promptState{"", std::vector<std::string>(), 0, nullptr}
@@ -298,10 +298,11 @@ class DisplayManager {
     int arrowPadding;
 
     // Components and state
-    TouchEventType inputState[HANDSHAKE_COUNT]   = {TOUCH_UP, TOUCH_UP, TOUCH_UP, TOUCH_UP};
+    TouchEventType (&inputStates)[HANDSHAKE_COUNT];
     unsigned long holdStartTime[HANDSHAKE_COUNT] = {0, 0, 0, 0};
     unsigned long repeatCount[HANDSHAKE_COUNT]   = {0, 0, 0, 0};
     unsigned long repeatDelay                    = INPUT_REPEAT_START_INTERVAL;
+    bool allInputsReleased                       = true;
     ComponentType currentComponent;
     ListState listState;
     PromptState promptState;

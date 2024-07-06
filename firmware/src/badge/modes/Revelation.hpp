@@ -7,18 +7,17 @@ static const char *TAG_REVELATIONMODE = "RevelationMode";
 
 class RevelationMode : public MessageMode {
   public:
-    RevelationMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch)
-        : MessageMode(display, leds, touch, "/revelations.txt", "/revelations_nsfw.txt") {
+    RevelationMode() : MessageMode(ModeType::REVELATION, "/revelations.txt", "/revelations_nsfw.txt") {
     }
 
   protected:
-    void startTask() override {
+    void start() override {
         if (!taskHandle) {
             xTaskCreate(revelationTask, "Revelation Task", 2048, this, 5, &taskHandle);
         }
     }
 
-    void stopTask() override {
+    void stop() override {
         if (taskHandle) {
             vTaskDelete(taskHandle);
             taskHandle = NULL;
@@ -33,7 +32,7 @@ class RevelationMode : public MessageMode {
             std::string revelation = self->getRandomMessage();
 
             self->display->setFont(MESSAGE_FONT);
-            self->display->setScrollSpeed(50);
+            self->display->setScrollSpeed(MESSAGE_SPEED);
             self->display->setScrollIterations(1);
             self->display->scrollText(revelation.c_str());
 

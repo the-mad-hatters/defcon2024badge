@@ -9,24 +9,26 @@
 static const char *TAG_HOMEMODE = "HomeMode";
 
 struct MenuItem {
-    std::string name;
-    std::function<bool()> action;
+    std::string name;             // Name of the menu item
+    std::function<bool()> action; // Action to perform when the item is selected
+                                  // Return true if the menu should navigate back, false to stay where it is
 };
 
 class HomeMode : public BadgeMode {
   public:
-    HomeMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch)
-        : homeTaskHandle(nullptr), badgeStartup(true), inMenu(false), menuIndex(0) {
-        this->display = display;
-        this->leds    = leds;
-        this->touch   = touch;
-
-        // Initialize the menu structure
+    HomeMode()
+        : BadgeMode(ModeType::HOME)
+        , homeTaskHandle(nullptr)
+        , badgeStartup(true)
+        , inMenu(false)
+        , switchingModes(false)
+        , menuIndex(0) {
         initializeMenu();
     }
 
     void enter() override {
         ESP_LOGD(TAG_HOMEMODE, "Entering Home mode");
+        switchingModes = false;
         if (badgeStartup) {
             badgeStartup = false;
             ESP_LOGD(TAG_HOMEMODE, "Badge startup detected, starting home init task");
@@ -39,8 +41,7 @@ class HomeMode : public BadgeMode {
     void exit() override {
         ESP_LOGD(TAG_HOMEMODE, "Exiting Home mode");
         stopInitTask();
-        leds->unlockNonAddressable(BOOK_EYE); // In case we were in (or switched modes from) the
-                                              // menu
+        leds->unlockNonAddressable(BOOK_EYE); // In case we were in (or switched modes from) the menu
     }
 
     void handleTouch(TouchEvent event) override {
@@ -62,6 +63,7 @@ class HomeMode : public BadgeMode {
     TaskHandle_t homeTaskHandle;
     bool badgeStartup;
     bool inMenu;
+    bool switchingModes;
     int menuIndex;
     std::vector<MenuItem> currentMenu;
     std::vector<MenuItem> mainMenu;
@@ -117,7 +119,8 @@ class HomeMode : public BadgeMode {
 
     void navigateBack() {
         if (!menuStack.empty()) {
-            std::tie(currentMenu, menuIndex) = menuStack.back(); // Restore previous menu and index
+            // Restore previous menu and index
+            std::tie(currentMenu, menuIndex) = menuStack.back();
             menuStack.pop_back();
             updateDisplay();
         } else {
@@ -134,29 +137,11 @@ class HomeMode : public BadgeMode {
     bool setMode(ModeType mode) {
         Badge &badge = Badge::getInstance();
         if (badge.hasMode(mode)) {
+            switchingModes = true;
             badge.setMode(mode);
         } else {
             ESP_LOGE(TAG_HOMEMODE, "Mode not found: %d", static_cast<int>(mode));
-
-            // Flash all 4 handshake LEDs red to indicate an error
-            const int LED_FLASH_DURATION = 900;
-            for (int j = 0; j < 3; ++j) {
-                for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                    leds->lockLed(TOUCH, handshakeLeds.right(i), CRGB::Yellow);
-                }
-                leds->show();
-                vTaskDelay((LED_FLASH_DURATION / 3 / 2) / portTICK_PERIOD_MS); // On duration
-                for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                    leds->lockLed(TOUCH, handshakeLeds.right(i), CRGB::Black);
-                }
-                leds->show();
-                vTaskDelay((LED_FLASH_DURATION / 3 / 2) / portTICK_PERIOD_MS); // Off duration
-            }
-            // Unlock the LEDs
-            for (int i = 0; i < HANDSHAKE_COUNT; ++i) {
-                leds->unlockLed(TOUCH, handshakeLeds.right(i));
-            }
-
+            badge.flashLedStrip(AddressableStrip::TOUCH, CRGB::Yellow, 3, 900);
             return false;
         }
 
@@ -165,74 +150,87 @@ class HomeMode : public BadgeMode {
 
     void updateDisplay() {
         ESP_LOGD(TAG_HOMEMODE, "Updating display");
-        stopInitTask();
 
-        if (inMenu) {
-            ESP_LOGD(TAG_HOMEMODE, "Showing menu");
-            leds->lockNonAddressable(BOOK_EYE, true);
-            display->setFont(u8g2_font_ncenB08_tr);
-
-            std::vector<const char *> menuItems;
-            for (const auto &item : currentMenu) {
-                menuItems.push_back(item.name.c_str());
-            }
-
-            display->showList(menuItems.data(), menuItems.size(), menuIndex, [this](int index) {
-                if (index == -1) {
-                    navigateBack();
-                } else if (index >= 0 && index < currentMenu.size()) {
-                    menuIndex   = index;
-                    bool goBack = currentMenu[index].action();
-                    if (goBack) {
-                        navigateBack();
-                    } else {
-                        updateDisplay();
-                    }
-                }
-            });
+        if (switchingModes) {
+            ESP_LOGD(TAG_HOMEMODE, "Switching modes, waiting for mode to change");
+            display->clear();
         } else {
-            ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
-            leds->unlockNonAddressable(BOOK_EYE);
-            display->drawImage(ImageID::ROCK, 0, 0);
+            if (inMenu) {
+                ESP_LOGD(TAG_HOMEMODE, "Showing menu");
+                leds->lockNonAddressable(BOOK_EYE, true);
+                display->setFont(u8g2_font_ncenB08_tr);
+
+                std::vector<const char *> menuItems;
+                for (const auto &item : currentMenu) {
+                    menuItems.push_back(item.name.c_str());
+                }
+
+                display->showList(menuItems.data(), menuItems.size(), menuIndex, [this](int index) {
+                    if (index == -1) {
+                        navigateBack();
+                    } else if (index >= 0 && index < currentMenu.size()) {
+                        menuIndex = index;
+                        if (currentMenu[index].action()) {
+                            navigateBack();
+                        } else {
+                            updateDisplay();
+                        }
+                    }
+                });
+            } else {
+                ESP_LOGD(TAG_HOMEMODE, "Showing seer stones");
+                leds->unlockNonAddressable(BOOK_EYE);
+                display->drawImage(ImageID::ROCK, 0, 0);
+            }
         }
+
+        // Make sure the init task is stopped
+        stopInitTask();
     }
 
     void stopInitTask() {
         if (homeTaskHandle) {
             ESP_LOGD(TAG_HOMEMODE, "Stopping home init task");
 
-            // Delete the task
-            vTaskDelete(homeTaskHandle);
-            homeTaskHandle = NULL;
+            // If called from the task itself
+            if (xTaskGetCurrentTaskHandle() == homeTaskHandle) {
+                ESP_LOGD(TAG_HOMEMODE, "Deleting self");
+                homeTaskHandle = nullptr;
+                vTaskDelete(nullptr);
+            }
+            // If called from outside the task
+            else {
+                ESP_LOGD(TAG_HOMEMODE, "Deleting task");
+                vTaskDelete(homeTaskHandle);
+                homeTaskHandle = nullptr;
+            }
         }
     }
 
     static void homeInitTask(void *pvParameters) {
         HomeMode *self = static_cast<HomeMode *>(pvParameters);
+        self->runInit();
+    }
 
+    void runInit() {
         // Set the menu flag to false in case we're coming back from somewhere else
-        self->inMenu = false;
+        inMenu = false;
 
         // Start the LEDs
         ESP_LOGD(TAG_HOMEMODE, "DC 32");
-        self->leds->clear(true);
-        self->leds->setScene(SceneType::DC32_Y2K_AESTHETIC);
+        leds->clear(true);
+        leds->setScene(SceneType::DC32_Y2K_AESTHETIC);
 
         // Show the title
-        self->display->setFont(u8g2_font_lubB14_tf);
-        self->display->showTextCentered("Mad Hatter\nAuto\nRevelator");
+        display->setFont(u8g2_font_lubB14_tf);
+        display->showTextCentered("Mad Hatter\nAuto\nRevelator");
 
         // Wait for 3 seconds
         vTaskDelay(3000 / portTICK_PERIOD_MS);
 
-        // Show the rock image
-        ESP_LOGD(TAG_HOMEMODE, "Showing rock image");
-        self->display->drawImage(ImageID::ROCK, 0, 0);
-
-        // We're done now so clean up and delete the task
-        ESP_LOGD(TAG_HOMEMODE, "Home init task complete");
-        self->homeTaskHandle = NULL;
-        vTaskDelete(nullptr);
+        // Show the seer stones
+        //   NOTE: as a side effect, updateDisplay() will delete this task via stopInitTask()
+        updateDisplay();
     }
 };
 

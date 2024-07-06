@@ -8,8 +8,8 @@
 #include "util.h"
 
 typedef enum {
-    TOUCH_DOWN,
     TOUCH_UP,
+    TOUCH_DOWN,
 } TouchEventType;
 
 typedef struct {
@@ -17,6 +17,7 @@ typedef struct {
     int pin;
     int value;
     bool changed;
+    unsigned long duration;
 } TouchEvent;
 
 // Map of handshake index to GPIO pin
@@ -48,13 +49,23 @@ class TouchHandler {
     void init();
     static void touchTask(void *pvParameters);
 
-    void clearEvents();
+    // Clear all touch events from the queue
+    void clearEvents(bool downOnly = false);
+
+    // Get the most recent events
+    TouchEvent (&getLatestEvents())[HANDSHAKE_COUNT];
+
+    // Get the current state of all touch inputs
+    TouchEventType (&getInputStates())[HANDSHAKE_COUNT];
 
   private:
     TouchHandler()                                = default;
     TouchHandler(const TouchHandler &)            = delete;
     TouchHandler &operator=(const TouchHandler &) = delete;
     bool initialized                              = false;
+    TouchEvent latestEvents[HANDSHAKE_COUNT];
+    TouchEventType inputStates[HANDSHAKE_COUNT]   = {TOUCH_UP, TOUCH_UP, TOUCH_UP, TOUCH_UP};
+    unsigned long holdStartTimes[HANDSHAKE_COUNT] = {0, 0, 0, 0};
 };
 
 #endif // TOUCH_HANDLER_H

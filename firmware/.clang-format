@@ -15,7 +15,7 @@ BreakConstructorInitializers: BeforeComma
 PackConstructorInitializers: NextLine
 IndentCaseLabels: true
 IndentPPDirectives: BeforeHash
-ColumnLimit: 100
+ColumnLimit: 120
 UseTab: Never
 IndentWidth: 4
 TabWidth: 4

@@ -13,12 +13,7 @@ static const char *TAG_HANDLEMODE = "HandleMode";
 
 class HandleMode : public BadgeMode {
   public:
-    HandleMode(DisplayManager *display, LedHandler *leds, TouchHandler *touch)
-        : handleTaskHandle(NULL), handle{0} {
-        this->display = display;
-        this->leds    = leds;
-        this->touch   = touch;
-
+    HandleMode() : BadgeMode(ModeType::DISPLAY_HANDLE), handleTaskHandle(NULL), handle{0} {
         initEEPROM();
     }
 
@@ -55,22 +50,19 @@ class HandleMode : public BadgeMode {
 
         // Show the prompt
         display->setFont(u8g2_font_ncenB08_tr, u8g2_font_ncenB10_tr);
-        display->showTextEntry(
-            "Enter your handle", handle.c_str(), lastChar, [this](std::string newHandle) {
-                if (newHandle.length() > MAX_HANDLE_LENGTH) {
-                    ESP_LOGW(TAG_HANDLEMODE, "Handle too long... truncating to %d characters",
-                             MAX_HANDLE_LENGTH);
-                    newHandle = newHandle.substr(0, MAX_HANDLE_LENGTH);
-                }
-                handle = newHandle;
-                saveHandle();
-                showHandle();
-            });
+        display->showTextEntry("Enter your handle", handle.c_str(), lastChar, [this](std::string newHandle) {
+            if (newHandle.length() > MAX_HANDLE_LENGTH) {
+                ESP_LOGW(TAG_HANDLEMODE, "Handle too long... truncating to %d characters", MAX_HANDLE_LENGTH);
+                newHandle = newHandle.substr(0, MAX_HANDLE_LENGTH);
+            }
+            handle = newHandle;
+            saveHandle();
+            showHandle();
+        });
     }
 
     void showHandle() {
-        DisplayManager::TextBounds bounds =
-            display->getTextBounds(u8g2_font_lubB14_tf, handle.c_str());
+        DisplayManager::TextBounds bounds = display->getTextBounds(u8g2_font_lubB14_tf, handle.c_str());
         display->setFont(u8g2_font_lubB14_tf);
 
         // If the handle is too long for the display, scroll it instead
