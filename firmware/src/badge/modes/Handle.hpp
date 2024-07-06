@@ -1,5 +1,5 @@
-#ifndef HANDLE_HPP
-#define HANDLE_HPP
+#ifndef MODE_HANDLE_HPP
+#define MODE_HANDLE_HPP
 
 #include "EEPROM.h"
 #include "badge/BadgeMode.h"
@@ -122,4 +122,4 @@ class HandleMode : public BadgeMode {
     }
 };
 
-#endif // HANDLE_HPP
+#endif // MODE_HANDLE_HPP

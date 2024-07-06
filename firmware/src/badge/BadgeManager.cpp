@@ -7,6 +7,7 @@
 #include "modes/Magic8Ball.hpp"
 #include "modes/MadHatterMeter.hpp"
 #include "modes/Handle.hpp"
+#include "modes/About.hpp"
 
 static const char *TAG = "BadgeManager";
 
@@ -38,6 +39,7 @@ void Badge::init() {
     modes[ModeType::MAGIC_8BALL]      = std::make_unique<Magic8BallMode>();
     modes[ModeType::MAD_HATTER_METER] = std::make_unique<MadHatterMeterMode>();
     modes[ModeType::DISPLAY_HANDLE]   = std::make_unique<HandleMode>();
+    modes[ModeType::ABOUT]            = std::make_unique<AboutMode>();
 
     // DEBUG: Print all modes and their addresses
     if (CORE_DEBUG_LEVEL >= 4) {

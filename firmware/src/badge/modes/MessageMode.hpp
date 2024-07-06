@@ -1,5 +1,5 @@
-#ifndef MESSAGE_MODE_HPP
-#define MESSAGE_MODE_HPP
+#ifndef MODE_MESSAGE_HPP
+#define MODE_MESSAGE_HPP
 
 #include <set>
 #include <vector>
@@ -153,4 +153,4 @@ class MessageMode : public BadgeMode {
     }
 };
 
-#endif // MESSAGE_MODE_HPP
+#endif // MODE_MESSAGE_HPP
