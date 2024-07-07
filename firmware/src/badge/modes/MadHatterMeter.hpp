@@ -48,7 +48,7 @@ class MadHatterMeterMode : public MessageMode {
 
         // Check for exit
         if (event.pin == HANDSHAKE_1) {
-            resetState();
+            Badge::getInstance().setMode(ModeType::HOME);
             return;
         }
 
