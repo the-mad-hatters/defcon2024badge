@@ -97,4 +97,10 @@ template <typename Container> std::string join(const Container &elements, const 
     return os.str();
 }
 
+// XOR encryption/decryption function
+std::string xorCrypt(const std::string &input, const std::string &key);
+
+// Hex to binary conversion
+std::string hexToBin(const std::string &hex);
+
 #endif // UTIL_H

@@ -21,6 +21,16 @@ enum class ModeType {
     ABOUT,
 };
 
+// NSFW prompt types
+enum class NSFWPromptType {
+    PASSWORD, // Enter a password to activate NSFW mode
+    QUESTION, // Simple prompt to turn NSFW mode on/off
+};
+
+#define NSFW_PASSWORD_KEY "𐐘𐐃𐐤|𐐣𐐈𐐔"                // Deseret Alphabet: "GONE|MAD"
+#define NSFW_PASSWORD_ENC "a2d5c6ddbcd1c4c6b4"     // XOR Encrypted: "REVELATED"
+#define NSFW_PROMPT_TYPE  NSFWPromptType::PASSWORD // Change this to switch between password and toggle prompts
+
 class BadgeMode {
   public:
     friend class Badge;
@@ -35,6 +45,7 @@ class BadgeMode {
         , latestEvents(touch->getLatestEvents())
         , allPins(handshakePins.right.keys())
         , NSFWPins(nsfwPins)
+        , nsfwPromptType(NSFW_PROMPT_TYPE)
         , showingNSFWPrompt(false) {
         // Calculate non-NSFW pins
         std::set_difference(allPins.begin(), allPins.end(), NSFWPins.begin(), NSFWPins.end(),
@@ -73,6 +84,7 @@ class BadgeMode {
     std::set<int> allPins;
     std::set<int> NSFWPins;
     std::set<int> nonNSFWPins;
+    NSFWPromptType nsfwPromptType;
     bool showingNSFWPrompt;
 
     void showNSFWPrompt();
