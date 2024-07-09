@@ -31,10 +31,11 @@ class BadgeMode {
         , leds(leds)
         , touch(touch)
         , type(type)
+        , inputStates(touch->getInputStates())
+        , latestEvents(touch->getLatestEvents())
         , allPins(handshakePins.right.keys())
         , NSFWPins(nsfwPins)
-        , inputStates(touch->getInputStates())
-        , latestEvents(touch->getLatestEvents()) {
+        , showingNSFWPrompt(false) {
         // Calculate non-NSFW pins
         std::set_difference(allPins.begin(), allPins.end(), NSFWPins.begin(), NSFWPins.end(),
                             std::inserter(nonNSFWPins, nonNSFWPins.begin()));
@@ -72,6 +73,7 @@ class BadgeMode {
     std::set<int> allPins;
     std::set<int> NSFWPins;
     std::set<int> nonNSFWPins;
+    bool showingNSFWPrompt;
 
     void showNSFWPrompt();
 };

@@ -3,6 +3,7 @@
 
 #include "badge/BadgeMode.h"
 #include "badge/BadgeManager.h"
+#include "version.h"
 
 static const char *TAG_ABOUTMODE = "AboutMode";
 
@@ -13,9 +14,10 @@ class AboutMode : public BadgeMode {
 
     void enter() override {
         ESP_LOGD(TAG_ABOUTMODE, "Entering About mode");
+        std::string aboutText = "Mad Hatter Badge\nv" + std::string(VERSION_STRING) + "\n\nhttps://madhatters.lol";
         display->clear();
         display->setFont(u8g2_font_ncenB08_tr);
-        display->showTextCentered("Mad Hatter Badge\nv1.0.0\n\nhttps://madhatters.lol");
+        display->showTextCentered(aboutText.c_str());
     }
 
     void leave() override {

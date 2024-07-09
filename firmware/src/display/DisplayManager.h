@@ -53,6 +53,9 @@ extern QueueHandle_t textScrollEvents;
 
 class DisplayManager {
   public:
+    friend class Badge;
+    friend class BadgeMode;
+
     struct TextBounds {
         int width;
         int height;
@@ -276,8 +279,17 @@ class DisplayManager {
     DisplayManager &operator=(const DisplayManager &) = delete;
     bool initialized                                  = false;
 
-    inline void setComponent(ComponentType component);
-    inline ComponentType getComponent();
+    inline void setComponent(ComponentType component) {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        currentComponent = component;
+        if (component == ComponentType::NONE) {
+            allInputsReleased = true;
+        }
+    }
+    inline ComponentType getComponent() {
+        std::lock_guard<std::mutex> lock(displayMutex);
+        return currentComponent;
+    }
 
     // Helper for calculating list bounds and state
     ListBounds getListBounds(std::vector<std::string> items, int selectedIndex);

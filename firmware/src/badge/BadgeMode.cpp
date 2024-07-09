@@ -15,6 +15,11 @@ void BadgeMode::handleTouch(TouchEvent event) {
 }
 
 void BadgeMode::showNSFWPrompt() {
+    if (showingNSFWPrompt) {
+        return;
+    }
+    showingNSFWPrompt = true;
+
     // Make sure we stop whatever the current mode is doing so we can show the prompt
     leave();
 
@@ -37,7 +42,8 @@ void BadgeMode::showNSFWPrompt() {
             vTaskDelay(std::max(0UL, (1000 - (millis() - loadStart))) / portTICK_PERIOD_MS);
         }
 
-        // Let the current mode do it's thing again
+        // Let the current mode go back to running again
+        showingNSFWPrompt = false;
         enter();
     });
 }

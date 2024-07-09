@@ -386,16 +386,31 @@ bool DisplayManager::handleTouch(TouchEvent event) {
     }
 
     // Components that want to handle any touch event rather than just TOUCH_DOWN
-    ComponentType needsUpDown[] = {
+    ComponentType passAllEvents[] = {
         // Text entry needs to handle all touch events to handle the backspace action which uses
         // both HANDSHAKE_2 and HANDSHAKE_3
         ComponentType::TEXT_ENTRY,
     };
 
-    // Unless it's a TOUCH_DOWN event or the component is in the needsUpDown list, we don't want
+    // Components that will handle multiple simultaneous touch events
+    ComponentType multiTouchComponents[] = {
+        // Text entry needs to handle all touch events to handle the backspace action which uses
+        // both HANDSHAKE_2 and HANDSHAKE_3
+        ComponentType::TEXT_ENTRY,
+    };
+
+    // Unless it's a TOUCH_DOWN event or the component is in the passAllEvents list, we don't want
     // to handle the event
-    if (std::find(std::begin(needsUpDown), std::end(needsUpDown), getComponent()) == std::end(needsUpDown) &&
+    if (std::find(std::begin(passAllEvents), std::end(passAllEvents), getComponent()) == std::end(passAllEvents) &&
         (event.type != TOUCH_DOWN || (!event.changed && !repeatAction))) {
+        return false;
+    }
+
+    // If the component is not in the multiTouchComponents list, we only want to handle one touch event
+    if (std::find(std::begin(multiTouchComponents), std::end(multiTouchComponents), getComponent()) ==
+            std::end(multiTouchComponents) &&
+        std::count_if(std::begin(inputStates), std::end(inputStates),
+                      [](TouchEventType type) { return type == TOUCH_DOWN; }) > 1) {
         return false;
     }
 
@@ -669,19 +684,6 @@ void DisplayManager::stopAnimations() {
         // Set the scrolling state to false
         scrollState.scrolling = false;
     }
-}
-
-inline void DisplayManager::setComponent(ComponentType component) {
-    std::lock_guard<std::mutex> lock(displayMutex);
-    currentComponent = component;
-    if (component == ComponentType::NONE) {
-        allInputsReleased = true;
-    }
-}
-
-inline DisplayManager::ComponentType DisplayManager::getComponent() {
-    std::lock_guard<std::mutex> lock(displayMutex);
-    return currentComponent;
 }
 
 DisplayManager::ListBounds DisplayManager::getListBounds(std::vector<std::string> items, int selectedIndex) {
