@@ -68,7 +68,7 @@ class HandleMode : public BadgeMode {
         // If the handle is too long for the display, scroll it instead
         if (bounds.width > display->getDisplayWidth()) {
             display->setScrollAlignment(SCROLL_ALIGN_MIDDLE);
-            display->setScrollSpeed(10);
+            display->setScrollSpeed(30);
             display->setScrollIterations(SCROLL_FOREVER);
             display->scrollText(handle.c_str());
         }
