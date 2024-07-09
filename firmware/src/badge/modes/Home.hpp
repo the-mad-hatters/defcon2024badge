@@ -18,7 +18,7 @@ class HomeMode : public BadgeMode {
   public:
     HomeMode()
         : BadgeMode(ModeType::HOME)
-        , homeTaskHandle(nullptr)
+        , taskHandle(nullptr)
         , badgeStartup(true)
         , inMenu(false)
         , switchingModes(false)
@@ -32,19 +32,20 @@ class HomeMode : public BadgeMode {
         if (badgeStartup) {
             badgeStartup = false;
             ESP_LOGD(TAG_HOMEMODE, "Badge startup detected, starting home init task");
-            xTaskCreate(homeInitTask, "Home Init Task", 2048, this, 5, &homeTaskHandle);
+            xTaskCreate(homeInitTask, "Home Init Task", 2048, this, 5, &taskHandle);
         } else {
             updateDisplay();
         }
     }
 
-    void exit() override {
+    void leave() override {
         ESP_LOGD(TAG_HOMEMODE, "Exiting Home mode");
         stopInitTask();
         leds->unlockNonAddressable(BOOK_EYE); // In case we were in (or switched modes from) the menu
     }
 
-    void handleTouch(TouchEvent event) override {
+  protected:
+    void receiveTouch(TouchEvent event) override {
         // Only react to touch down events
         if (!event.changed || event.type != TOUCH_DOWN) {
             return;
@@ -60,7 +61,7 @@ class HomeMode : public BadgeMode {
     }
 
   private:
-    TaskHandle_t homeTaskHandle;
+    TaskHandle_t taskHandle;
     bool badgeStartup;
     bool inMenu;
     bool switchingModes;
@@ -189,20 +190,20 @@ class HomeMode : public BadgeMode {
     }
 
     void stopInitTask() {
-        if (homeTaskHandle) {
+        if (taskHandle) {
             ESP_LOGD(TAG_HOMEMODE, "Stopping home init task");
 
             // If called from the task itself
-            if (xTaskGetCurrentTaskHandle() == homeTaskHandle) {
+            if (xTaskGetCurrentTaskHandle() == taskHandle) {
                 ESP_LOGD(TAG_HOMEMODE, "Deleting self");
-                homeTaskHandle = nullptr;
+                taskHandle = nullptr;
                 vTaskDelete(nullptr);
             }
             // If called from outside the task
             else {
                 ESP_LOGD(TAG_HOMEMODE, "Deleting task");
-                vTaskDelete(homeTaskHandle);
-                homeTaskHandle = nullptr;
+                vTaskDelete(taskHandle);
+                taskHandle = nullptr;
             }
         }
     }

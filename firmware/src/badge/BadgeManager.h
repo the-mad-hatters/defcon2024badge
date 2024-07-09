@@ -25,6 +25,21 @@ class Badge {
     bool hasMode(ModeType mode);
 
     /**
+     * @brief Set the NSFW mode flag
+     *
+     * @param nsfw True to enable NSFW mode, false to disable
+     * @return True if the NSFW mode flag changed, false if it was already set to the requested value
+     */
+    bool setNSFWMode(bool nsfw);
+
+    /**
+     * @brief Get the NSFW mode flag
+     *
+     * @return True if NSFW mode is enabled, false if disabled
+     */
+    bool getNSFWMode();
+
+    /**
      * @brief Flash an LED strip with a color given a count of flashes to do and a total duration
      *
      * @param strip The addressable strip to flash all LEDs on
@@ -39,7 +54,8 @@ class Badge {
         : currentMode(nullptr)
         , display(DisplayManager::getInstance())
         , touch(TouchHandler::getInstance())
-        , leds(LedHandler::getInstance()) {};
+        , leds(LedHandler::getInstance())
+        , nsfwMode(false) {};
     Badge(const Badge &)            = delete;
     Badge &operator=(const Badge &) = delete;
 
@@ -52,6 +68,7 @@ class Badge {
 
     BadgeMode *currentMode;
     std::mutex modeMutex;
+    bool nsfwMode;
 
     // Keep a map of all modes
     std::unordered_map<ModeType, std::unique_ptr<BadgeMode>> modes;

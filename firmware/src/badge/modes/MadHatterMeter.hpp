@@ -18,11 +18,11 @@ class MadHatterMeterMode : public MessageMode {
   public:
     MadHatterMeterMode()
         : MessageMode(ModeType::MAD_HATTER_METER, "/emeter.txt", "/emeter_nsfw.txt")
-        , inputStates(touch->getInputStates())
-        , state(State::WAITING) {
+        , state(State::WAITING)
+        , taskHandle(nullptr) {
     }
 
-    void start() override {
+    void enter() override {
         ESP_LOGD(TAG_MADHATTERMETER, "Entering Mad Hatter Meter mode");
         resetState();
         if (!taskHandle) {
@@ -31,7 +31,7 @@ class MadHatterMeterMode : public MessageMode {
         }
     }
 
-    void stop() override {
+    void leave() override {
         ESP_LOGD(TAG_MADHATTERMETER, "Exiting Mad Hatter Meter mode");
         if (taskHandle) {
             vTaskDelete(taskHandle);
@@ -40,8 +40,8 @@ class MadHatterMeterMode : public MessageMode {
         leds->unlockLed(AddressableStrip::TOUCH, 3);
     }
 
-    void handleTouch(TouchEvent event) override {
-        MessageMode::handleTouch(event);
+  protected:
+    void receiveTouch(TouchEvent event) override {
         if (event.type != TOUCH_DOWN) {
             return;
         }
@@ -73,11 +73,12 @@ class MadHatterMeterMode : public MessageMode {
     static const int touchEventBufferSizeMax = 100;
 
     std::mutex touchMutex;
-    TouchEventType (&inputStates)[HANDSHAKE_COUNT];
     std::mutex stateMutex;
     State state;
     int initialAverage;
     double initialStandardDeviation;
+
+    TaskHandle_t taskHandle;
 
     static void stateManagerTask(void *pvParameters) {
         MadHatterMeterMode *self = static_cast<MadHatterMeterMode *>(pvParameters);

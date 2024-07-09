@@ -13,7 +13,7 @@ static const char *TAG_HANDLEMODE = "HandleMode";
 
 class HandleMode : public BadgeMode {
   public:
-    HandleMode() : BadgeMode(ModeType::DISPLAY_HANDLE), handleTaskHandle(NULL), handle{0} {
+    HandleMode() : BadgeMode(ModeType::DISPLAY_HANDLE), taskHandle(nullptr), handle{0} {
         initEEPROM();
     }
 
@@ -39,7 +39,7 @@ class HandleMode : public BadgeMode {
         }
     }
 
-    void exit() override {
+    void leave() override {
         ESP_LOGD(TAG_HANDLEMODE, "Exiting Handle mode");
         display->clear();
     }
@@ -78,7 +78,8 @@ class HandleMode : public BadgeMode {
         }
     }
 
-    void handleTouch(TouchEvent event) override {
+  protected:
+    void receiveTouch(TouchEvent event) override {
         if (!event.changed || event.type != TOUCH_DOWN) {
             return;
         }
@@ -88,7 +89,7 @@ class HandleMode : public BadgeMode {
     }
 
   private:
-    TaskHandle_t handleTaskHandle;
+    TaskHandle_t taskHandle;
     std::string handle;
 
     void initEEPROM() {

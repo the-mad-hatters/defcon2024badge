@@ -7,22 +7,26 @@ static const char *TAG_REVELATIONMODE = "RevelationMode";
 
 class RevelationMode : public MessageMode {
   public:
-    RevelationMode() : MessageMode(ModeType::REVELATION, "/revelations.txt", "/revelations_nsfw.txt") {
+    RevelationMode()
+        : MessageMode(ModeType::REVELATION, "/revelations.txt", "/revelations_nsfw.txt"), taskHandle(nullptr) {
     }
 
   protected:
-    void start() override {
+    void enter() override {
         if (!taskHandle) {
             xTaskCreate(revelationTask, "Revelation Task", 2048, this, 5, &taskHandle);
         }
     }
 
-    void stop() override {
+    void leave() override {
         if (taskHandle) {
             vTaskDelete(taskHandle);
             taskHandle = NULL;
         }
     }
+
+  private:
+    TaskHandle_t taskHandle;
 
     static void revelationTask(void *pvParameters) {
         RevelationMode *self = static_cast<RevelationMode *>(pvParameters);

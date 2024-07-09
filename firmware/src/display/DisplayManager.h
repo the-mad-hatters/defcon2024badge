@@ -15,7 +15,7 @@
 #define SCROLL_FOREVER      -1
 
 // Initial interval for touch input repeat - reduced as the button is held
-#define INPUT_REPEAT_START_INTERVAL 500
+#define INPUT_REPEAT_START_INTERVAL 300
 
 // Callbacks for user input
 using ListCallback      = std::function<void(int selected)>;

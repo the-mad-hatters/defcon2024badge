@@ -18,12 +18,13 @@ class AboutMode : public BadgeMode {
         display->showTextCentered("Mad Hatter Badge\nv1.0.0\n\nhttps://madhatters.lol");
     }
 
-    void exit() override {
+    void leave() override {
         ESP_LOGD(TAG_ABOUTMODE, "Exiting About mode");
         display->clear();
     }
 
-    void handleTouch(TouchEvent event) override {
+  protected:
+    void receiveTouch(TouchEvent event) override {
         if (event.pin == HANDSHAKE_1 && event.type == TOUCH_DOWN) {
             Badge::getInstance().setMode(ModeType::HOME);
         }

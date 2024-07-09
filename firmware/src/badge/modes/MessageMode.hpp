@@ -11,135 +11,73 @@
 #include "badge/BadgeMode.h"
 #include "sync.h"
 
-#define MESSAGE_SPEED        40
-#define MESSAGE_FONT         u8g2_font_ncenB10_tr
-#define PROMPT_FONT          u8g2_font_ncenB08_tr
-#define NSFW_ACTIVATION_TIME 1000
+#define MESSAGE_SPEED 40
+#define MESSAGE_FONT  u8g2_font_ncenB10_tr
 
 static const char *TAG_MESSAGEMODE = "MessageMode";
 
 class MessageMode : public BadgeMode {
   public:
+    friend class Badge;
+
     MessageMode(ModeType type, const char *normalFile, const char *nsfwFile,
                 const std::set<int> &nsfwPins = {HANDSHAKE_2, HANDSHAKE_3})
-        : BadgeMode(type)
-        , taskHandle(NULL)
-        , nsfwMode(false)
-        , normalFile(normalFile)
-        , nsfwFile(nsfwFile)
-        , inputStates(touch->getInputStates())
-        , latestEvents(touch->getLatestEvents()) {
-        // Initialize NSFW pins
-        NSFWPins.insert(nsfwPins.begin(), nsfwPins.end());
-
-        // Calculate non-NSFW pins
-        std::set<int> allPins = handshakePins.right.keys();
-        std::set_difference(allPins.begin(), allPins.end(), NSFWPins.begin(), NSFWPins.end(),
-                            std::inserter(nonNSFWPins, nonNSFWPins.begin()));
-
-        // Load messages
-        loadMessages(normalFile);
+        : BadgeMode(type, nsfwPins), normalFile(normalFile), nsfwFile(nsfwFile) {
+        loadMessages();
     }
 
-    void enter() override {
-        start();
-    }
-
-    void exit() override {
-        stop();
-    }
-
-    void handleTouch(TouchEvent event) override {
-        // Exit early if the event is not for one of the NSFW pins
-        if (event.type != TOUCH_DOWN ||
-            std::none_of(std::begin(NSFWPins), std::end(NSFWPins), [event](int pin) { return pin == event.pin; })) {
-            return;
-        }
-
-        // Ensure no non-NSFW pins are touched
-        if (std::any_of(nonNSFWPins.begin(), nonNSFWPins.end(),
-                        [this](int pin) { return inputStates[handshakePins.right(pin)] == TOUCH_DOWN; })) {
-            return;
-        }
-
-        // If all NSFW pins are touched and the duration is long enough, activate NSFW mode
-        if (std::all_of(std::begin(NSFWPins), std::end(NSFWPins), [this](int pin) {
-                int index = handshakePins.right[pin];
-                return inputStates[index] == TOUCH_DOWN && latestEvents[index].duration > NSFW_ACTIVATION_TIME;
-            })) {
-            showNSFWPrompt();
-        }
+    const char *getBaseType() const override {
+        return "MessageMode";
     }
 
   protected:
-    TaskHandle_t taskHandle;
     std::vector<std::string> messages;
-    bool nsfwMode;
     const char *normalFile;
     const char *nsfwFile;
-    TouchEventType (&inputStates)[HANDSHAKE_COUNT];
-    TouchEvent (&latestEvents)[HANDSHAKE_COUNT];
-    std::set<int> NSFWPins;
-    std::set<int> nonNSFWPins;
 
-    virtual void start() = 0;
-    virtual void stop()  = 0;
+    void loadMessages() {
+        std::vector<std::string> paths = Badge::getInstance().getNSFWMode()
+                                             ? std::vector<std::string>{normalFile, nsfwFile}
+                                             : std::vector<std::string>{normalFile};
 
-    void loadMessages(const char *path) {
+        // Clear the existing messages and load from the file(s)
         messages.clear();
+        for (const auto &path : paths) {
+            int count = 0;
 
-        // Lock the peripheral mutex to prevent concurrent access
-        if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
+            // Lock the peripheral mutex to prevent concurrent access
+            if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
 
-            if (!SPIFFS.exists(path)) {
-                ESP_LOGE(TAG_MESSAGEMODE, "Messages file not found: %s", path);
-                return;
-            }
-            File file = SPIFFS.open(path);
-            if (!file) {
-                ESP_LOGE(TAG_MESSAGEMODE, "Failed to open messages file: %s", path);
-                return;
-            }
-
-            while (file.available()) {
-                String line = file.readStringUntil('\n');
-                if (line.length() > 0) {
-                    messages.push_back(line.c_str());
+                if (!SPIFFS.exists(path.c_str())) {
+                    ESP_LOGE(TAG_MESSAGEMODE, "Messages file not found: %s", path);
+                    return;
                 }
-            }
-            file.close();
+                File file = SPIFFS.open(path.c_str(), "r");
+                if (!file) {
+                    ESP_LOGE(TAG_MESSAGEMODE, "Failed to open messages file: %s", path);
+                    return;
+                }
 
-            // Release the peripheral mutex
-            xSemaphoreGive(peripheralSync);
+                while (file.available()) {
+                    String line = file.readStringUntil('\n');
+                    line.trim();
+                    if (line.length() > 0) {
+                        messages.push_back(line.c_str());
+                        count++;
+                    }
+                }
+                file.close();
+
+                // Release the peripheral mutex
+                xSemaphoreGive(peripheralSync);
+            }
+
+            ESP_LOGI(TAG_MESSAGEMODE, "Loaded %d messages from %s", count, path.c_str());
         }
 
         if (messages.empty()) {
-            ESP_LOGE(TAG_MESSAGEMODE, "No messages loaded from %s", path);
-        } else {
-            ESP_LOGI(TAG_MESSAGEMODE, "Loaded %d messages from %s", messages.size(), path);
+            ESP_LOGE(TAG_MESSAGEMODE, "No messages loaded");
         }
-    }
-
-    void showNSFWPrompt() {
-        stop();
-        const char *options[] = {"Activate", "Deactivate"};
-        display->setFont(PROMPT_FONT);
-        display->showPrompt("NSFW mode", options, 2, nsfwMode ? 1 : 0, [this](int index) {
-            // Set NSFW mode based on the selected index
-            bool previousNsfwMode = nsfwMode;
-            nsfwMode              = index == 0;
-
-            if (previousNsfwMode != nsfwMode) {
-                // Update the messages and display them accordingly
-                const char *message = nsfwMode ? "NSFW loading..." : "Back to safety";
-                display->setFont(PROMPT_FONT);
-                display->showTextCentered(message);
-                vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait briefly so the message can be
-                                                       // read
-                loadMessages(nsfwMode ? nsfwFile : normalFile);
-            }
-            start();
-        });
     }
 
     std::string getRandomMessage() {

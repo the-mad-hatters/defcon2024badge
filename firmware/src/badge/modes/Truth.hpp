@@ -7,24 +7,27 @@ static const char *TAG_TRUTHMODE = "TruthMode";
 
 class TruthMode : public MessageMode {
   public:
-    TruthMode() : MessageMode(ModeType::TRUTH, "/truths.txt", "/truths_nsfw.txt") {
+    TruthMode() : MessageMode(ModeType::TRUTH, "/truths.txt", "/truths_nsfw.txt"), taskHandle(nullptr) {
     }
 
   protected:
-    void start() override {
+    void enter() override {
         if (!taskHandle) {
             ESP_LOGD(TAG_TRUTHMODE, "Starting truth task");
             xTaskCreate(truthTask, "Truth Task", 2048, this, 5, &taskHandle);
         }
     }
 
-    void stop() override {
+    void leave() override {
         if (taskHandle) {
             ESP_LOGD(TAG_TRUTHMODE, "Stopping truth task");
             vTaskDelete(taskHandle);
             taskHandle = NULL;
         }
     }
+
+  private:
+    TaskHandle_t taskHandle;
 
     static void truthTask(void *pvParameters) {
         TruthMode *self = static_cast<TruthMode *>(pvParameters);

@@ -1,5 +1,7 @@
 #include "BadgeManager.h"
 
+#include <type_traits>
+
 // Include all modes
 #include "modes/Home.hpp"
 #include "modes/Truth.hpp"
@@ -106,7 +108,7 @@ void Badge::modeInputTask(void *pvParameters) {
                                     ESP_LOGD(TAG, "Current mode is already HOME, not exiting");
                                     continue;
                                 }
-                                self->currentMode->exit();
+                                self->currentMode->leave();
                                 self->currentMode = nullptr;
                             }
                         }
@@ -151,7 +153,7 @@ void Badge::modeManagerTask(void *pvParameters) {
             {
                 std::lock_guard<std::mutex> lock(self->modeMutex);
                 if (self->currentMode) {
-                    self->currentMode->exit();
+                    self->currentMode->leave();
                 }
                 self->currentMode = self->modes[mode].get();
                 if (self->currentMode) {
@@ -175,4 +177,30 @@ BadgeMode *Badge::getMode() {
 bool Badge::hasMode(ModeType mode) {
     ESP_LOGD(TAG, "hasMode(%d: %s)", static_cast<int>(mode), ModeTitle.at(mode));
     return modes.find(mode) != modes.end();
+}
+
+bool Badge::setNSFWMode(bool nsfw) {
+    bool oldNSFWMode = nsfwMode;
+    nsfwMode         = nsfw;
+
+    // If the NSFW mode didn't change, return early
+    if (oldNSFWMode == nsfwMode) {
+        ESP_LOGD(TAG, "NSFW mode is already %s", nsfwMode ? "enabled" : "disabled");
+        return false;
+    }
+
+    // Call loadMessages on all modes that derive from MessageMode to reload messages so they match the NSFW setting
+    ESP_LOGD(TAG, "NSFW mode %s, updating MessageMode instances...", nsfwMode ? "enabled" : "disabled");
+    for (const auto &mode : modes) {
+        if (mode.second->getBaseType() == "MessageMode") {
+            ESP_LOGD(TAG, "Loading messages for mode mode %s", ModeTitle.at(mode.first));
+            static_cast<MessageMode *>(mode.second.get())->loadMessages();
+        }
+    }
+
+    return true;
+}
+
+bool Badge::getNSFWMode() {
+    return nsfwMode;
 }

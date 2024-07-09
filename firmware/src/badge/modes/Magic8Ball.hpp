@@ -10,16 +10,12 @@ class Magic8BallMode : public MessageMode {
     Magic8BallMode() : MessageMode(ModeType::MAGIC_8BALL, "/8ball.txt", "/8ball_nsfw.txt") {
     }
 
-    void handleTouch(TouchEvent event) override {
-        MessageMode::handleTouch(event);
-    }
-
   protected:
-    void start() override {
+    void enter() override {
         showPrompt();
     }
 
-    void stop() override {
+    void leave() override {
     }
 
     void showPrompt() {
