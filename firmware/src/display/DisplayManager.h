@@ -118,12 +118,14 @@ class DisplayManager {
     }
 
     // ----------------------------------------------------------------------------------------- //
-    // Getters for calculated/display properties                                                 //
+    // Getters/setters for calculated/display properties                                                 //
     // ----------------------------------------------------------------------------------------- //
 
     void getDisplaySize(int &width, int &height);
     int getDisplayWidth();
     int getDisplayHeight();
+    void setXOffset(int offset);
+    void setYOffset(int offset);
     TextBounds getTextBounds(const uint8_t *font, const char *text);
 
     // ----------------------------------------------------------------------------------------- //
@@ -303,6 +305,9 @@ class DisplayManager {
     std::mutex displayMutex;
     u8g2_uint_t displayWidth;
     u8g2_uint_t displayHeight;
+    int xOffset = 0; // X offset screen size constraint
+    int yOffset = 0; // Y offset screen size constraint
+
     const uint8_t *font;
     const uint8_t *largerFont;
     const uint8_t *symbolFont;

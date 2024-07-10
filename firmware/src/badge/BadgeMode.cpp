@@ -53,6 +53,7 @@ void BadgeMode::showNSFWPrompt() {
             vTaskDelay(std::max(0UL, (1000 - (millis() - loadStart))) / portTICK_PERIOD_MS);
 
             showingNSFWPrompt = false;
+            touch->clearEvents();
             enter();
         });
     } else if (nsfwPromptType == NSFWPromptType::QUESTION) {
@@ -76,6 +77,7 @@ void BadgeMode::showNSFWPrompt() {
 
             // Let the current mode go back to running again
             showingNSFWPrompt = false;
+            touch->clearEvents();
             enter();
         });
     }

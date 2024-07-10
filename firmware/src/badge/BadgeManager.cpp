@@ -31,8 +31,10 @@ void Badge::init() {
     // Initialize the rest of the badge components
     display.init();
     touch.init();
-    // LedHandler &leds = LedHandler::getInstance();
     leds.init();
+
+    // Adjust display offset due to screen misalignment
+    display.setYOffset(4);
 
     // Initialize all modes here
     modes[ModeType::HOME]             = std::make_unique<HomeMode>();

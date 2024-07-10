@@ -51,6 +51,16 @@ int DisplayManager::getDisplayHeight() {
     return displayHeight;
 }
 
+void DisplayManager::setXOffset(int offset) {
+    std::lock_guard<std::mutex> lock(displayMutex);
+    this->xOffset = offset;
+}
+
+void DisplayManager::setYOffset(int offset) {
+    std::lock_guard<std::mutex> lock(displayMutex);
+    this->yOffset = offset;
+}
+
 DisplayManager::TextBounds DisplayManager::getTextBounds(const uint8_t *font, const char *text) {
     TextBounds bounds;
 
@@ -89,7 +99,7 @@ void DisplayManager::drawImage(ImageID imageId, u8g2_uint_t x, u8g2_uint_t y) {
         std::lock_guard<std::mutex> lock(displayMutex);
         u8g2.firstPage();
         do {
-            u8g2.drawXBMP(x, y, image.width, image.height, image.data);
+            u8g2.drawXBMP(x + xOffset, y + yOffset, image.width, image.height, image.data);
         } while (u8g2.nextPage());
         xSemaphoreGive(peripheralSync);
     }
@@ -104,7 +114,7 @@ void DisplayManager::showTextAt(const char *text, u8g2_uint_t x, u8g2_uint_t y) 
         do {
             u8g2.setFont(font);
             u8g2.setFontPosTop();
-            u8g2.drawStr(x, y, text);
+            u8g2.drawStr(x + xOffset, y + yOffset, text);
         } while (u8g2.nextPage());
         xSemaphoreGive(peripheralSync);
     }
@@ -135,7 +145,7 @@ void DisplayManager::showTextCentered(const char *text) {
         u8g2.setFont(font);
         int lineHeight  = u8g2.getMaxCharHeight();
         textBlockHeight = lineHeight * lines.size();
-        y               = std::max(0, (displayHeight - textBlockHeight) / 2);
+        y               = std::max(0, (displayHeight - textBlockHeight) / 2) + yOffset;
     }
 
     if (xSemaphoreTake(peripheralSync, portMAX_DELAY) == pdTRUE) {
@@ -146,7 +156,7 @@ void DisplayManager::showTextCentered(const char *text) {
             u8g2.setFontPosTop();
             for (const auto &line : lines) {
                 int textWidth = u8g2.getStrWidth(line.c_str());
-                int x         = std::max(0, (displayWidth - textWidth) / 2);
+                int x         = std::max(0, (displayWidth - textWidth) / 2) + xOffset;
                 u8g2.drawStr(x, y, line.c_str());
                 y += u8g2.getMaxCharHeight();
             }
@@ -195,7 +205,7 @@ void DisplayManager::renderList() {
 
     // Calculate the list bounds and scroll offset
     ListBounds bounds = getListBounds(listState.items, listState.selectedIndex);
-    int itemsPerPage  = displayHeight / bounds.items.itemHeight;
+    int itemsPerPage  = (displayHeight - yOffset) / bounds.items.itemHeight;
     int scrollOffset  = getListScrollOffset(listState.selectedIndex, itemsPerPage);
 
     // Render the list
@@ -206,12 +216,13 @@ void DisplayManager::renderList() {
         do {
             for (int i = scrollOffset;
                  i < std::min(listState.items.size(), static_cast<std::size_t>(scrollOffset + itemsPerPage)); i++) {
-                int y = (i - scrollOffset + 1) * bounds.items.itemHeight;
+                int y = (i - scrollOffset) * bounds.items.itemHeight +
+                        ((displayHeight - (bounds.items.itemHeight * itemsPerPage)) / 2) + yOffset;
                 u8g2.setFont(font);
-                u8g2.drawStr(bounds.items.offset.x, y, listState.items[i].c_str());
+                u8g2.drawStr(bounds.items.offset.x + xOffset, y, listState.items[i].c_str());
                 if (i == listState.selectedIndex) {
                     u8g2.setFont(symbolFont);
-                    u8g2.drawUTF8(bounds.arrow.offset.x, y + bounds.arrow.offset.y, arrowChar);
+                    u8g2.drawUTF8(bounds.arrow.offset.x + xOffset, y + bounds.arrow.offset.y, arrowChar);
                 }
             }
         } while (u8g2.nextPage());
@@ -227,8 +238,8 @@ void DisplayManager::renderPrompt() {
 
     // Calculate the list bounds and scroll offset
     ListBounds listBounds = getListBounds(promptState.options, promptState.selectedOption);
-    int itemsPerPage      = (displayHeight - promptBounds.height - promptPadding) / listBounds.items.itemHeight;
-    int scrollOffset      = getListScrollOffset(promptState.selectedOption, itemsPerPage);
+    int itemsPerPage = (displayHeight - promptBounds.height - promptPadding - yOffset) / listBounds.items.itemHeight;
+    int scrollOffset = getListScrollOffset(promptState.selectedOption, itemsPerPage);
 
     // Render the prompt
     stopAnimations();
@@ -239,16 +250,17 @@ void DisplayManager::renderPrompt() {
             // Draw prompt centered at the top
             u8g2.setFont(font);
             int promptWidth = u8g2.getStrWidth(promptState.prompt.c_str());
-            int promptX     = (displayWidth - promptWidth) / 2;
-            u8g2.drawStr(promptX, promptPadding, promptState.prompt.c_str());
+            int promptX     = (displayWidth - promptWidth) / 2 + xOffset;
+            u8g2.drawStr(promptX, promptPadding / 2 + yOffset, promptState.prompt.c_str());
 
             // Draw options centered below the prompt
             int yOffset = listBounds.items.itemHeight;
             for (int i = scrollOffset;
                  i < std::min(promptState.options.size(), static_cast<std::size_t>(scrollOffset + itemsPerPage)); i++) {
-                int y           = yOffset + (promptPadding * 2) + (i - scrollOffset) * listBounds.items.itemHeight;
+                int y =
+                    yOffset + (promptPadding * 1.5) + (i - scrollOffset) * listBounds.items.itemHeight + this->yOffset;
                 int optionWidth = u8g2.getStrWidth(promptState.options[i].c_str());
-                int optionX     = std::max(0, (displayWidth - listBounds.items.width)) / 2;
+                int optionX     = std::max(0, (displayWidth - listBounds.items.width)) / 2 + xOffset;
                 u8g2.setFont(font);
                 u8g2.drawStr(optionX, y, promptState.options[i].c_str());
                 if (i == promptState.selectedOption) {
@@ -266,11 +278,13 @@ void DisplayManager::renderTextEntry() {
     setComponent(ComponentType::TEXT_ENTRY);
 
     const int promptPadding   = 8;
+    const char *cursorChar    = "_";
     const int cursorPadding   = 4;
     const int selectorPadding = 2;
 
     TextBounds promptBounds = getTextBounds(font, textEntryState.prompt.c_str());
     TextBounds entryBounds  = getTextBounds(font, textEntryState.enteredText.c_str());
+    TextBounds cursorBounds = getTextBounds(font, cursorChar);
     TextBounds selectedChar;
     {
         std::lock_guard<std::mutex> lock(displayMutex);
@@ -302,26 +316,27 @@ void DisplayManager::renderTextEntry() {
         do {
             // Draw prompt centered at the top
             u8g2.setFont(font);
-            int promptX = (displayWidth - promptBounds.width) / 2;
-            u8g2.drawStr(promptX, promptPadding, textEntryState.prompt.c_str());
+            int promptX = (displayWidth - promptBounds.width) / 2 + xOffset;
+            u8g2.drawStr(promptX, promptPadding / 2 + yOffset, textEntryState.prompt.c_str());
 
             // Draw entered text with cursor
-            int enteredX = cursorPadding;
-            int enteredY = promptPadding + entryBounds.height + cursorPadding;
+            int enteredX = cursorPadding + xOffset -
+                           std::max(0, (entryBounds.width + (cursorPadding * 2) + cursorBounds.width - displayWidth));
+            int enteredY = promptPadding + entryBounds.height + cursorPadding + yOffset;
             u8g2.setFont(font);
             u8g2.drawStr(enteredX, enteredY, textEntryState.enteredText.c_str());
-            u8g2.drawStr(enteredX + entryBounds.width, enteredY, "_");
+            u8g2.drawStr(enteredX + entryBounds.width, enteredY, cursorChar);
 
             // Draw a line to separate the entered text from the character selector
             int lineY = enteredY + entryBounds.height + cursorPadding;
             u8g2.drawLine(0, lineY, displayWidth, lineY);
 
             // Draw available characters with selected character highlighted
-            int selectionY = displayHeight - selectedChar.height - cursorPadding;
-            int selectionX = (displayWidth - (selectedChar.width + selectorPadding) * visibleChars) / 2;
+            int selectionY = displayHeight - selectedChar.height - cursorPadding + yOffset;
+            int selectionX = (displayWidth - (selectedChar.width + selectorPadding) * visibleChars) / 2 + xOffset;
 
             for (int i = visibleStart; i < visibleEnd; ++i) {
-                int charX          = selectionX + (i - visibleStart) * (selectedChar.width + selectorPadding);
+                int charX          = selectionX + (i - visibleStart) * (selectedChar.width + selectorPadding) + xOffset;
                 char charToDraw[2] = {textEntryState.availableChars[i], '\0'};
 
                 if (i == textEntryState.selectedCharIndex) {
@@ -639,7 +654,7 @@ void DisplayManager::doScrollText() {
                     do {
                         u8g2.clearBuffer();
                         u8g2.setFontPosTop();
-                        u8g2.drawStr(scrollX - offset, scrollY, scrollState.text.c_str());
+                        u8g2.drawStr(scrollX - offset + xOffset, scrollY + yOffset, scrollState.text.c_str());
                     } while (u8g2.nextPage());
                 }
                 xSemaphoreGive(peripheralSync);

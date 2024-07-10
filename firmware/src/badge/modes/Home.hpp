@@ -223,7 +223,7 @@ class HomeMode : public BadgeMode {
         leds->setScene(SceneType::DC32_Y2K_AESTHETIC);
 
         // Show the title
-        display->setFont(u8g2_font_lubB14_tf);
+        display->setFont(u8g2_font_lubB10_tf);
         display->showTextCentered("Mad Hatter\nAuto\nRevelator");
 
         // Wait for 3 seconds
