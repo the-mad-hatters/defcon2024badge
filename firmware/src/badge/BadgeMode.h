@@ -27,8 +27,8 @@ enum class NSFWPromptType {
     QUESTION, // Simple prompt to turn NSFW mode on/off
 };
 
-#define NSFW_PASSWORD_KEY "𐐘𐐃𐐤|𐐣𐐈𐐔"                // Deseret Alphabet: "GONE|MAD"
-#define NSFW_PASSWORD_ENC "a2d5c6ddbcd1c4c6b4"     // XOR Encrypted: "REVELATED"
+#define NSFW_PASSWORD_KEY "𐐘𐐃𐐤|𐐣𐐈𐐔"                
+#define NSFW_PASSWORD_ENC "a2d5c6ddbcd1c4c6b4"     
 #define NSFW_PROMPT_TYPE  NSFWPromptType::PASSWORD // Change this to switch between password and toggle prompts
 
 class BadgeMode {
